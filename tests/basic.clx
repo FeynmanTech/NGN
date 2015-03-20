@@ -1,0 +1,26 @@
+## BASIC FUNCTION TESTS
+function multiplyTwo : var1, var2
+{
+	return $var1 * $var2;
+};
+## Basic functionality - output: 6
+print(multiplyTwo(2, 3));
+## Var assignment - output: 12 20
+$twelve = multiplyTwo(3, 4);
+$twenty = multiplyTwo(4, 5);
+print($twelve, $twenty);
+## Varargs - output: 240
+print(multiplyTwo($twelve, $twenty)); ## 12*20 == 240
+
+## RECURSION
+function recurse : n {
+	if $n < 1
+	{
+		print($n);
+	} else {
+		print($n);
+		recurse($n - 1);
+	};
+};
+
+recurse(5);
