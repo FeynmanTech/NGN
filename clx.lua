@@ -3,8 +3,8 @@
 
 cl = {}
 
-src = {}
-src.factorial = [[
+cl.src = {}
+cl.src.factorial = [[
     function factorial : num, cval {
         if $cval ~= 0 {
             if $num <= 1 {
@@ -19,7 +19,7 @@ src.factorial = [[
     print(factorial(10,0));
 ]]
 
-src.errors = [[
+cl.src.errors = [[
 $nd += 1;
     
 $nd = 1;
