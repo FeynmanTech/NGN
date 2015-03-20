@@ -38,10 +38,12 @@ Although they use the keyword "type", types could more accurately be called "tem
 			## stuff
 		};
 	};
+### Instances ###
 Instances are created and used like this:
 
     new type_name: instance_name(args);
     instance_name > method (arg);
+### Output ###
 To print things, you can use either this:
 
     print("stuff");
