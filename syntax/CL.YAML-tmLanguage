@@ -1,0 +1,80 @@
+comment: 'CL Syntax: version 0.2'
+fileTypes: [cl, clx, clang]
+foldingStartMarker: ^\s*\b(function|if|for)\b|{[ \t]*$|\[\[
+foldingStopMarker: \b}\;\b|^\s*}\;|\]\]
+keyEquivalent: ^~L
+name: CL
+patterns:
+- captures:
+    '1': {name: keyword.control.cl}
+    '2': {name: entity.name.function.cl}
+    '3': {name: punctuation.definition.parameters.begin.cl}
+    '4': {name: variable.parameter.function.cl}
+    '5': {name: keyword.operator.cl}
+    '6': {name: variable.parameter.function.cl}
+  match: \b(type)\s+([a-zA-Z0-9_]+)\s*([:]+)\s*([A-Za-z0-9_\$,\s]+)\s*(\=)\s*([\"\'A-Za-z0-9_\$,\s=]+)
+  name: meta.function.cl
+- captures:
+    '1': {name: keyword.control.cl}
+    '2': {name: entity.name.function.cl}
+    '3': {name: punctuation.definition.parameters.begin.cl}
+    '4': {name: variable.parameter.function.cl}
+  match: \b(function)\s+([a-zA-Z0-9_]+)\s*([:]+)\s*([A-Za-z0-9_\$,\s]+)
+  name: meta.function.cl
+- captures:
+    '1': {name: entity.name.function.cl}
+    '2': {name: punctuation.definition.parameters.begin.cl}
+    '3': {name: variable.parameter.function.cl}
+  match: \b([\@a-zA-Z0-9_]+)\s*([:]+)\s*([A-Za-z0-9_\$,\s]+)
+  name: meta.function.cl
+- {match: '(?<![\d.])\s0x[a-fA-F\d]+|\b\d+(\.\d+)?([eE]-?\d+)?|\.\d+([eE]-?\d+)?',
+  name: constant.numeric.cl}
+- begin: ''''
+  beginCaptures:
+    '0': {name: punctuation.definition.string.begin.cl}
+  end: ''''
+  endCaptures:
+    '0': {name: punctuation.definition.string.end.cl}
+  name: string.quoted.single.cl
+  patterns:
+  - {match: \\., name: constant.character.escape.cl}
+- begin: '"'
+  beginCaptures:
+    '0': {name: punctuation.definition.string.begin.cl}
+  end: '"'
+  endCaptures:
+    '0': {name: punctuation.definition.string.end.cl}
+  name: string.quoted.double.cl
+  patterns:
+  - {match: \\., name: constant.character.escape.cl}
+- begin: (?<!--)\[(=*)\[
+  beginCaptures:
+    '0': {name: punctuation.definition.string.begin.cl}
+  end: \]\1\]
+  endCaptures:
+    '0': {name: punctuation.definition.string.end.cl}
+  name: string.quoted.other.multiline.cl
+- begin: \[\#
+  captures:
+    '0': {name: punctuation.definition.comment.cl}
+  end: \#\]
+  name: comment.block.cl
+- captures:
+    '1': {name: punctuation.definition.comment.cl}
+  match: (\#\#).*$\n?
+  name: comment.line.cl
+- {match: \b(for|while|if|else|elseif|return|def|function|type|new)\b, name: keyword.control.cl}
+- {match: \b(print|set)\b, name: support.function.cl}
+- {match: '(\$)([A-Za-z0-9_]+)', name: entity.name.function.cl}
+- {match: '(\@)([A-Za-z0-9_]+)', name: entity.name.function.cl}
+- captures:
+    '1': {name: keyword.control.cl}
+    '2': {name: entity.name.function.scope.cl}
+  match: (\@[a-zA-Z_]+)\b:\b([a-zA-Z_\$\,\s]+)
+  name: meta.function.cl
+- {match: '(?<![^.]\.|:)\b(false|nil|true|math\.(pi|huge))\b|(?<![.])\.{3}(?!\.)',
+  name: constant.language.cl}
+- {match: '(?<![^.]\.|:)\b(self)\b', name: variable.language.self.cl}
+- {match: '\+|-|%|\*|\/|\^|==?|~=|<=?|>=?|>|\:|(?<!\.)\.{2}(?!\.)', name: keyword.operator.cl}
+scopeName: source.cl
+uuid: 93E017CC-6F27-11D9-90EB-000D93589AF7
