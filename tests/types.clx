@@ -1,0 +1,44 @@
+[#
+TODO:
+    Fix instance>method bug (see logger>print)
+    Better names for things (types aren't really types, but not really classes either)
+    Improve on the terrible crap instance declaration syntax:
+        Current:
+            new type : name(args);  - HORRIBLE
+        Options:
+            name : new type(args);  - Good, but mostly taken from java
+            new type(args) : name;  - Good, but could use better flow?
+            name : type(args);      - Maybe, CLX doesn't really need new anyways
+            type(args) name;        - no
+            type name(args)         - seriously this is an assignment not a declaration
+            n;a;m;e;t;y;p;e;a;r;g;s - this language is already dumb
+    Better name for the language as a whole
+#]
+type number : $value=0 {
+    @mult : $num {
+        return $value * $num;
+    };
+    @add : $num {
+        return $value + $num;
+    };
+    @get : null {
+        return $value;
+    };
+};
+## somewhat works, but not really
+type logger : $t=0 {
+    @print : $title, $val {
+        print($title, $t, $val);
+    };
+};
+new logger: disp(": ");
+@disp > print("title", "val");
+
+new number:zero();
+print "0*10: " .. @zero>mult(10);
+
+new number : three(3);
+print "3*6: " .. @three>mult(6);
+print "3+10: " .. @three > add (10);
+
+print "Value of @three: " .. @three > get();
