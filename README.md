@@ -44,6 +44,14 @@ Instances are created and used like this:
 
     new type_name: instance_name(args);
     instance_name > method (arg);
+### Arrays ###
+The syntax for array creation and access is exactly like it is in Lua:
+
+    $array = {1, 2, 3, 4};
+    $indexedArray = {["a"] = 1, ["b"] = 2, ["c"] = 3};
+    $foo = $array[1]; ## result: 1
+    $bar = $indexedArray["b"]; ## result: 2
+The array.index syntax from Lua is not supported yet, but it will be soon.
 ### Output ###
 To print things, you can use either this:
 
