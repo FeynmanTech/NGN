@@ -1,0 +1,37 @@
+$limit = 4096;
+
+$A = {};
+for $index : 2, $limit, 1
+{
+    $A [$index] = true;
+};
+
+for $i : 2, sqrt($limit), 1
+{
+    if $A [$i] 
+    {
+        for $j : $i^2, $limit, $i
+        {
+            $A [$j] = false;
+        };
+    };
+};
+
+$output = "";
+$needsComma = false;
+ 
+for $index : 2, $limit, 1
+{
+    if $A[$index]
+    {
+        if $needsComma 
+        {
+            $output .= ", ";
+        } else {
+            $needsComma = true;
+        };
+        $output .= $index;
+    };
+};
+
+print $output;
