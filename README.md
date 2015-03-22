@@ -20,6 +20,22 @@ All variables are stored with global visibility except function and type argumen
     $var1 ~= $var2
 
 All boolean operators are the same as those in Lua.
+### Loops ###
+For loops:
+    ## Default-step for loop:
+    for $varname : $start, $end {
+        print($varname);
+        ## other stuff
+    };
+    ## Set-step for loop:
+    for $varname : $start, $end, $step {
+        ## do stuff
+    };
+While loops:
+    while $conditions==true {
+        ## do stuff
+    };
+The loop will repeat until $some_conditions is false. The conditions are re-evaluated after each loop.
 ### Function definition ###
 
     function funcName : $arg1, $arg2
