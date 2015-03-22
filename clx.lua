@@ -3,8 +3,8 @@
 
 cl = {}
 
-cl.src = {}
-cl.src.factorial = [[
+src = {}
+src.factorial = [[
     function factorial : num, cval {
         if $cval ~= 0 {
             if $num <= 1 {
@@ -19,7 +19,7 @@ cl.src.factorial = [[
     print(factorial(10,0));
 ]]
 
-cl.src.errors = [[
+src.errors = [[
 $nd += 1;
     
 $nd = 1;
@@ -30,19 +30,25 @@ $str++;
 ]]
 
 --# StrOps
-function cl.getArgsFromString(argStr)
+function cl.getArgsFromString(argStr, lvars)
     local args = {}
     local aPos, aCount, aCurrent, aLevel, aLChar = 1, 1, "", 0, ""
-    local aChars = {["("] = ")", ["{"] = "}"}
+    local aChars = {["("] = ")", ["{"] = "}", ['"'] = '"', ["'"] = "'", ["["] = "]"}
     local aStr = ""
+    local aIndex
     --print(argStr)
     while aPos <= #argStr do
         local cc = argStr:sub(aPos, aPos)
         aStr = aStr .. cc .. ": level " .. aLevel .. ", end " .. aLChar .. "\n"
-        if cc == "(" or cc == "{" then
+        if aChars[cc] then
             aLevel = aLevel + 1
             aLChar = aChars[cc]
-            aCurrent = aCurrent .. cc
+            if cc == "[" and aLevel == 0 then
+                aIndex = argStr:match("%b[]", aPos):sub(2, -2)
+                aCurrent = aCurrent + argStr:match("%b[]", aPos):sub(2, -2):len()
+            else
+                aCurrent = aCurrent .. cc
+            end
         elseif cc == aLChar then
             aLevel = aLevel - 1
             aCurrent = aCurrent .. cc
@@ -51,10 +57,22 @@ function cl.getArgsFromString(argStr)
             if aPos >= #argStr and cc ~= "," then
                 aCurrent = aCurrent .. cc
             end
-            table.insert(args, aCurrent)
+            if aIndex then
+                args[cl.eval(aIndex, lvars)] = cl.eval(aCurrent, lvars)
+            else
+                table.insert(args, cl.eval(aCurrent, lvars))
+            end
+            aIndex = nil
             --print("Arg: ", aCurrent)
             aCurrent = ""
+            --[[
+            while aPos <= #argStr and argStr:sub(aPos, aPos):match("%s") do
+                aPos = aPos + 1
+            end
+            --[=[
+            --]]
             aPos = aPos + 1
+            --]=]
         else
             aCurrent = aCurrent .. cc
         end
@@ -77,13 +95,18 @@ cl.types = {}
 
 cl.objects = {}
 
+cl.CurrentLine = 1
+cl.CurrentChar = 1
+
 -- for $varname : start, end, step { statement; }; 
 cl.key["for"] = "for%s-%$(%S+)%s-:%s-([^,]-),%s-([^,{]-),%s-([^{]-)%s-(%b{});"
 cl.proc["for"] = function(lvars, var, start, stop, step, src)
-    lvars[var] = start
-    while tonumber(lvars[var]) <= tonumber(stop) do
+    lvars[var] = tonumber(cl.eval(start, lvars))
+    stop = tonumber(cl.eval(stop, lvars))
+    step = tonumber(cl.eval(step, lvars))
+    while lvars[var] <= stop do
         cl.parse(src:sub(2, -2), lvars)
-        lvars[var] = lvars[var] + eval(step, lvars)
+        lvars[var] = lvars[var] + step
     end
 end
 cl.rank["for"] = 0
@@ -91,7 +114,7 @@ cl.rank["for"] = 0
 cl.key["while"] = "while%s-([^{]-)%s-(%b{});"
 cl.proc["while"] = function(lvars, conditions, src)
     --lvars[var] = start
-    while isTrue(conditions, lvars) do
+    while cl.isTrue(conditions, lvars) do
         cl.parse(src:sub(2, -2), lvars)
     end
 end
@@ -101,7 +124,7 @@ cl.rank["while"] = 0
 cl.key["if"] = "if%s-([^{]-)%s-(%b{});"
 cl.proc["if"] = function(lvars, conditions, src)
     --lvars[var] = start
-    if isTrue(conditions, lvars) then
+    if cl.isTrue(conditions, lvars) then
         cl.parse(src:sub(2, -2), lvars)
     end
 end
@@ -110,7 +133,7 @@ cl.rank["if"] = 0
 cl.key["if.-{.-}%s-else%s-%b{}"] = "if%s-([^{]-)%s-(%b{})%s-else%s-(%b{});"
 cl.proc["if.-{.-}%s-else%s-%b{}"] = function(lvars, conditions, src, src2)
     --lvars[var] = start
-    if isTrue(conditions, lvars) then
+    if cl.isTrue(conditions, lvars) then
         cl.parse(src:sub(2, -2), lvars)
     else
         cl.parse(src2:sub(2, -2), lvars)
@@ -121,7 +144,7 @@ cl.rank["if.-{.-}%s-else%s-%b{}"] = 1
 cl.key["if.-{.-}%s-elseif"] = "if%s-([^{]-)%s-(%b{})%s-(elseif%s-[^}]+%s-%b{}.-;~)"
 cl.proc["if.-{.-}%s-elseif"] = function(lvars, conditions, src, chunk2)
     --lvars[var] = start
-    if isTrue(conditions, lvars) then
+    if cl.isTrue(conditions, lvars) then
         cl.parse(src:sub(2, -2), lvars)
     else
         cl.parse(chunk2:sub(5, -1), lvars)
@@ -139,17 +162,14 @@ cl.proc["return"] = function(lvars, args)
         _RETURN = eval(arg, lvars)
     end
     --]]
-    _RETURN = eval(args, lvars)
+    _RETURN = cl.eval(args, lvars)
     --print(_RETURN)
 end
 cl.rank["return"] = 0
 
 cl.key["print"] = "print%s+(.-);"
 cl.proc["print"] = function(lvars, stuff)
-    stuff = "," .. stuff .. ","
-    for v in stuff:gmatch(",%s-(.-),") do
-        print(eval(v, lvars))
-    end
+    print(unpack(cl.getArgsFromString(stuff, lvars)))
 end
 cl.rank["print"] = 2
 
@@ -188,7 +208,7 @@ cl.key["new"] = "new%s+([%w_]+)%s-:%s-([%w_]+)%s-(%b());"
 cl.proc["new"] = function(lvars, t, name, args)
     if cl.types[t] then
         cl.objects[name] = cl.types[t]
-        local arg = cl.getArgsFromString(args:sub(2,-2))
+        local arg = cl.getArgsFromString(args:sub(2,-2), lvars)
         local a = 1
         for av in cl.types[t].__args:gmatch("([%w_]+)") do
             arg[av] = arg[a]
@@ -209,19 +229,19 @@ end
 cl.key["%@%s-[%w_]+%s->%s-[%w_]+%s-%b()"] = "%@%s-([%w_]+)%s->%s-([%w_]+)%s-(%b())"
 cl.proc["%@%s-[%w_]+%s->%s-[%w_]+%s-%b()"] = function(lvars, obj, method, args)
     if cl.objects[obj] and cl.objects[obj].__src[method] then
-        local arg = cl.getArgsFromString(args:sub(2,-2))
+        local arg = cl.getArgsFromString(args:sub(2,-2), lvars)
         local a = 1
         for i, v in ipairs(arg) do
-            arg[i] = eval(v, lvars)
+            arg[i] = cl.eval(v, lvars)
             --print(i, v)
         end
         for av in cl.objects[obj].__src[method][1]:gmatch("([%w_]+)") do
-            arg[av] = eval(arg[a], lvars)
+            arg[av] = cl.eval(arg[a], lvars)
             --print(av, arg[a])
             a = a + 1
         end
         for i, v in pairs(cl.objects[obj].__vars) do
-            arg[i] = eval(v, lvars)
+            arg[i] = cl.eval(v, lvars)
         end
         cl.objects[obj].__run[method](cl.objects[obj], arg)
     elseif cl.objects[obj] and not cl.objects[obj].__src[method] then
@@ -243,9 +263,21 @@ end
 
 cl.ops, cl.opProc = {}, {}
 
-cl.ops["="] = "$([%w_]+)%s-=%s-([^;]+);"
+cl.ops["="] = "$([%w_]+)%s-=%s-([^{][^;]+);"
 cl.opProc["="] = function(lvars, var, val)
-    cl.vars[var] = eval(val, lvars)
+    cl.vars[var] = cl.eval(val, lvars)
+    --print(var, cl.vars[var])
+end
+
+cl.ops["ArrayAssignment"] = "%$([%w_]+)%s-(%b[])%s-=%s-([^;]+);"
+cl.opProc["ArrayAssignment"] = function(lvars, var, index, val)
+    --print(var, cl.eval(index:sub(2, -2), lvars), cl.eval(val, lvars))
+    cl.vars[var][cl.eval(index:sub(2, -2), lvars)] = cl.eval(val, lvars)
+end
+
+cl.ops["array"] = "%$(%w+)%s-=%s-(%b%{%});"
+cl.opProc["array"] = function(lvars, var, val)
+    cl.vars[var] = cl.getArgsFromString(val:sub(2, -2), lvars)
 end
 
 cl.ops["+="] = "$([%w_]+)%s-%+%s-=%s-([^;]+);"
@@ -254,12 +286,12 @@ cl.opProc["+="] = function(lvars, var, val)
         clError("$"..var.."+="..val, "Operation on undefined variable "..var)
         return
     end
-    local res = eval(val, lvars)
+    local res = cl.eval(val, lvars)
     if not(tonumber(res)) then
         clError("$"..var.."+="..val, "Operation on numeric $" .. var .. " using non-numeric value")
         return
     end
-    cl.vars[var] = cl.vars[var] + eval(val, lvars)
+    cl.vars[var] = cl.vars[var] + cl.eval(val, lvars)
 end
 
 cl.ops["++"] = "$([%w_]+)%s-%+%s-%+%s-;"
@@ -283,12 +315,12 @@ cl.opProc["-="] = function(lvars, var, val)
         clError("$"..var.."+="..val, "Numeric operation on variable "..var .. " of non-numeric type " .. type(cl.vars[var]))
         return
     end
-    local res = eval(val, lvars)
+    local res = cl.eval(val, lvars)
     if not(tonumber(res)) then
         clError("$"..var.."-="..val, "Operation on numeric $" .. var .. " using non-numeric value")
         return
     end
-    cl.vars[var] = cl.vars[var] + eval(val, lvars)
+    cl.vars[var] = cl.vars[var] + cl.eval(val, lvars)
 end
 
 cl.ops["--"] = "$([%w_]+)%s-%-%s-%-%s-;"
@@ -309,16 +341,8 @@ cl.opProc[".="] = function(lvars, var, val)
         clError("$"..var..".="..val, "Operation on undefined variable "..var)
         return
     end
-    cl.vars[var] = tostring(cl.vars[var]) .. tostring(eval(val, lvars))
+    cl.vars[var] = tostring(cl.vars[var]) .. tostring(cl.eval(val, lvars))
 end
-
---[[
-local preProc, preFunc = {}, {}
-preProc.def = "def%s-(%S+)%s+([^\n]+)"
-preFunc.def = function(src, n, v)
-    return src:gsub("@" .. n, v)
-end
-]]
 
 cl.func = {}
 _RETURNSTACK ={}
@@ -351,13 +375,25 @@ end
 cl.func.print = function(lvars, ...) 
     local t = {}
     for i, v in ipairs{...} do
-        table.insert(t, eval(v, lvars))
+        table.insert(t, v)
     end
     print(unpack(t))
 end
 
 cl.func.set = function(lvars, name, val)
     cl.vars[name] = val
+end
+
+for i, v in pairs(math) do
+    cl.func[i] = function(lvars, ...) return v(...) end
+end
+
+cl.func.raw = function(lvars, str)
+    local value;
+    local f, err = loadstring("return " .. str)
+    local s, val = pcall(f)
+    if not(err) then value = val else value = str end
+    return value
 end
 
 cl.func.lua = function(lvars, s) return loadstring(s:gsub("cl.vars", "({...})[1]"))(cl.vars) end
@@ -370,75 +406,37 @@ end
 CL_LOC = ""
 
 function clError(loc, msg)
-    print('Error: ' .. loc .. '\n' .. msg)
+    print('Error: line ' .. cl.CurrentLine .. ":" .. cl.CurrentChar .. '\n' .. msg)
 end
 
-function eval(statement, lvars)
-    statement = tostring(statement)
+function cl.eval(statement, lvars)
+    cl.lvars = lvars
+    statement = tostring(statement) .. " " -- easy bugfix
     lvars = lvars or {}
     local value
     for i, v in pairs(lvars) do
-        statement = statement:gsub("%$" .. tostring(i), trim(v))
+        statement = statement:gsub("%$" .. tostring(i) .. "%s-(%b[])", "cl.lvars[ [[" .. i .. "]] ]%1")
+        statement = statement:gsub("%$" .. tostring(i) .. "(%W)", "cl.lvars[ [[" .. i .. "]] ]%1")
     end
     for i, v in pairs(cl.vars) do
-        statement = statement:gsub("%$" .. tostring(i), trim(v))
+        statement = statement:gsub("%$" .. tostring(i) .. "%s-(%b[])", "cl.vars[ [[" .. tostring(i) .. "]] ]%1")
+        statement = statement:gsub("%$" .. tostring(i) .. "(%W)", "cl.vars[ [[" .. i .. "]] ]%1")
     end
-    --[[
-    string.gsub(statement, "([%w_]+)%s-(%b%(%))", function(active, argStr)
-        local args = {}
-        for arg in argStr:gmatch("([^,]-),") do
-            arg = trim(arg)
-            arg = eval(arg, lvars) or arg
-            table.insert(args, arg)
-        end
-        if cl.func[active] then
-            local r = cl.func[active](unpack(args))
-            return r or ""
-        end
-    end)
-    --]]
     statement = statement:gsub("(%@%s-[%w_]+%s->%s-[%w_]+%s-%b())", "runMethod[[%1]]")
     for i, v in pairs(cl.func) do
-        statement = string.gsub(statement, i.."%s-(%b())", "(getFunc('"..i.."))%1")
+        statement = string.gsub(statement, i.."%s-(%b())", "(getFunc([["..i.."]]))(cl.lvars, unpack(cl.getArgsFromString('%1', cl.lvars)))")
     end
     local f, err = loadstring("return " .. statement)
     local s, val = pcall(f)
-    if not err then value = val or statement else value = statement end
+    if not(err) then value = val else value = statement end
     return value
 end
 
-function isTrue(statement, lvars)
-    statement = tostring(statement)
-    lvars = lvars or {}
-    local value
-    for i, v in pairs(lvars) do
-        statement = statement:gsub("%$" .. tostring(i), trim(v))
-    end
-    for i, v in pairs(cl.vars) do
-        statement = statement:gsub("%$" .. tostring(i), trim(v))
-    end
-    statement = statement:gsub("([%w_]-)%s-(%b%(%))", function(active, argStr)
-        local args = {}
-        for arg in argStr:gmatch("([^,]-),") do
-            arg = trim(arg)
-            arg = eval(arg, lvars) or arg
-            table.insert(args, arg)
-        end
-        local r = cl.func[active](unpack(args))
-        return r or ""
-    end)
-    local f, err = loadstring("return " .. statement)
-    if not err then value = f() else value = statement end
-    return value, err
+function cl.isTrue(statement, lvars)
+    return cl.eval(statement, lvars)
 end
     
 function cl.parse(str, lvars)
-    --[[
-    for i, v in pairs(preProc) do
-        --print(preFunc[i])
-        str = str:gsub(v, preFunc[i])
-    end
-    --]]
     lvars = lvars or {}
     while str:match("  ") do
         str = str:gsub("  ", " ")
@@ -448,6 +446,12 @@ function cl.parse(str, lvars)
     local pos = 0
     local p = true
     while (pos < #str) and p do
+        if str:sub(pos, pos) == "\n" then
+            cl.CurrentLine = cl.CurrentLine + 1
+            cl.CurrentChar = 1
+        else
+            cl.CurrentChar = cl.CurrentChar + 1
+        end
         local active = str:sub(pos, str:find("[^%w_]", pos) -1)
         if str:sub(pos, pos+1):find("%s") then
             pos = pos + 1
@@ -465,47 +469,7 @@ function cl.parse(str, lvars)
             pos = pos + e - b
         elseif cl.func[active] then
             local argStr = (str:match("%b()", pos):sub(2, -2) .. ","):gsub(",%s+", ",")
-            --[=[
-            local args = {}
-            local aPos, aCount, aCurrent, aLevel, aLChar = 1, 1, "", 0, ""
-            local aChars = {["("] = ")", ["{"] = "}"}
-            --[[
-            for arg in argStr:gmatch("([^,]-),") do
-                arg = trim(arg)
-                arg = eval(arg, lvars) or arg
-                table.insert(args, arg)
-            end
-            --[
-            --]]
-            local aStr = ""
-            --print(argStr)
-            while aPos <= #argStr do
-                local cc = argStr:sub(aPos, aPos)
-                aStr = aStr .. cc .. ": level " .. aLevel .. ", end " .. aLChar .. "\n"
-                if cc == "(" or cc == "{" then
-                    aLevel = aLevel + 1
-                    aLChar = aChars[cc]
-                    aCurrent = aCurrent .. cc
-                elseif cc == aLChar then
-                    aLevel = aLevel - 1
-                    aCurrent = aCurrent .. cc
-                    aLChar = ""
-                elseif cc == "," and aLevel == 0 then
-                    table.insert(args, aCurrent)
-                    --print("Arg: ", aCurrent)
-                    aCurrent = ""
-                    aPos = aPos + 1
-                else
-                    aCurrent = aCurrent .. cc
-                end
-                --print(cc)
-                aPos = aPos + 1
-                
-            end
-            --print(aStr)
-            --print(table.concat(args, "; "))
-            --]=]
-            local args = cl.getArgsFromString(argStr)
+            local args = cl.getArgsFromString(argStr, lvars)
             cl.func[active](lvars, unpack(args))
             pos = str:find("%)%s-;", pos+1) + 1
         else
@@ -538,4 +502,10 @@ end
 
 function cl.parseFile(f)
     cl.parse(io.open(f, "r"):read("*all"))
+end
+
+if arg then
+    if arg[1] then
+        cl.parseFile(arg[1])
+    end
 end
