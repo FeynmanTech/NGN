@@ -22,6 +22,7 @@ All variables are stored with global visibility except function and type argumen
 All boolean operators are the same as those in Lua.
 ### Loops ###
 For loops:
+
     ## Default-step for loop:
     for $varname : $start, $end {
         print($varname);
@@ -32,6 +33,7 @@ For loops:
         ## do stuff
     };
 While loops:
+
     while $conditions==true {
         ## do stuff
     };
