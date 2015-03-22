@@ -103,13 +103,24 @@ cl.key["for"] = "for%s-%$(%S+)%s-:%s-([^,]-),%s-([^,{]-),%s-([^{]-)%s-(%b{});"
 cl.proc["for"] = function(lvars, var, start, stop, step, src)
     lvars[var] = tonumber(cl.eval(start, lvars))
     stop = tonumber(cl.eval(stop, lvars))
-    step = tonumber(cl.eval(step, lvars))
+    step = tonumber(cl.eval(step, lvars)) or 1
     while lvars[var] <= stop do
         cl.parse(src:sub(2, -2), lvars)
         lvars[var] = lvars[var] + step
     end
 end
 cl.rank["for"] = 0
+
+cl.key["for-default"] = "for%s-%$(%S+)%s-:%s-([^,]-),%s-([^,{]-)%s-(%b{});"
+cl.proc["for-default"] = function(lvars, var, start, stop, src)
+    lvars[var] = tonumber(cl.eval(start, lvars))
+    stop = tonumber(cl.eval(stop, lvars))
+    while lvars[var] <= stop do
+        cl.parse(src:sub(2, -2), lvars)
+        lvars[var] = lvars[var] + 1
+    end
+end
+cl.rank["for-default"] = 0
 -- while conditions { statement; };
 cl.key["while"] = "while%s-([^{]-)%s-(%b{});"
 cl.proc["while"] = function(lvars, conditions, src)
@@ -172,6 +183,15 @@ cl.proc["print"] = function(lvars, stuff)
     print(unpack(cl.getArgsFromString(stuff, lvars)))
 end
 cl.rank["print"] = 2
+
+cl.key["write"] = "write%s+(.-);"
+cl.proc["write"] = function(lvars, stuff)
+    local t = cl.getArgsFromString(stuff, lvars)
+    for i, v in ipairs(t) do
+        io.write(v)
+    end
+end
+cl.rank["write"] = 2
 
 --[[
 EXAMPLE TYPEDEF:
@@ -380,6 +400,13 @@ cl.func.print = function(lvars, ...)
     print(unpack(t))
 end
 
+cl.func.write = function(lvars, ...) 
+    local t = {}
+    for i, v in ipairs{...} do
+        io.write(v)
+    end
+end
+
 cl.func.set = function(lvars, name, val)
     cl.vars[name] = val
 end
@@ -388,12 +415,28 @@ for i, v in pairs(math) do
     cl.func[i] = function(lvars, ...) return v(...) end
 end
 
-cl.func.raw = function(lvars, str)
+cl.func.simplifyType = function(lvars, str)
     local value;
     local f, err = loadstring("return " .. str)
     local s, val = pcall(f)
     if not(err) then value = val else value = str end
     return value
+end
+
+function cl.func.runfile(lvars, filename, is_critical)
+    local success = cl.parseFile(filename)
+    if is_critical ~= false and not success then
+        clError("runfile(\""..filename.."\")", "Unable to open file for parsing")
+    end
+    return success
+end
+
+function cl.func.require(lvars, filename)
+    local success = cl.parseFile(filename)
+    if not success then
+        clError("runfile(\""..filename.."\")", "Unable to open file for parsing")
+    end
+    return success
 end
 
 cl.func.lua = function(lvars, s) return loadstring(s:gsub("cl.vars", "({...})[1]"))(cl.vars) end
@@ -407,6 +450,7 @@ CL_LOC = ""
 
 function clError(loc, msg)
     print('Error: line ' .. cl.CurrentLine .. ":" .. cl.CurrentChar .. '\n' .. msg)
+    os.exit()
 end
 
 function cl.eval(statement, lvars)
@@ -437,6 +481,7 @@ function cl.isTrue(statement, lvars)
 end
     
 function cl.parse(str, lvars)
+    str = str .. "\n"
     lvars = lvars or {}
     while str:match("  ") do
         str = str:gsub("  ", " ")
@@ -501,7 +546,14 @@ function cl.parse(str, lvars)
 end
 
 function cl.parseFile(f)
-    cl.parse(io.open(f, "r"):read("*all"))
+    local file = io.open(f, "r")
+    if file then
+        cl.parse(file:read("*all"))
+        file:close()
+        return true
+    else
+        return false
+    end
 end
 
 if arg then

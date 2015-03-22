@@ -1,37 +1,27 @@
 $limit = 4096;
-
 $A = {};
-for $index : 2, $limit, 1
-{
+for $index : 2, $limit {
     $A [$index] = true;
 };
 
-for $i : 2, sqrt($limit), 1
-{
-    if $A [$i] 
-    {
-        for $j : $i^2, $limit, $i
-        {
+for $i : 2, sqrt($limit) {
+    if $A [$i] {
+        for $j : $i^2, $limit, $i {
             $A [$j] = false;
         };
     };
 };
 
-$output = "";
 $needsComma = false;
- 
-for $index : 2, $limit, 1
-{
-    if $A[$index]
-    {
-        if $needsComma 
-        {
-            $output .= ", ";
+for $index : 2, $limit {
+    if $A[$index] {
+        if $needsComma {
+            write(", ");
         } else {
             $needsComma = true;
         };
-        $output .= $index;
+        write $index;
     };
 };
 
-print $output;
+print ;
