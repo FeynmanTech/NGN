@@ -1,0 +1,16 @@
+ignoreErrors(true);
+
+## Operator errors
+$undefined++;
+$undefined+=1;
+
+$number = 1;
+$non_number = "not a number";
+$number += "not a number";
+
+$non_number++;
+$non_number += 2;
+
+new non_type() : instance;
+
+@non_object > test();

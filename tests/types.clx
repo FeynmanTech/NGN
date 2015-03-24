@@ -13,6 +13,7 @@ TODO:
             type name(args)         - seriously this is an assignment not a declaration
             n;a;m;e;t;y;p;e;a;r;g;s - this language is already dumb
     Better name for the language as a whole
+        Maybe LPL?
 #]
 type number : $value=0 {
     @mult : $num {
@@ -31,13 +32,13 @@ type logger : $t=0 {
         print($title, $t, $val);
     };
 };
-new logger: disp(": ");
+new logger(": ") : disp;
 @disp > print("title", "val");
 
-new number:zero();
+new number():zero;
 print "0*10: " .. @zero>mult(10);
 
-new number : three(3);
+new number() : three;
 print "3*6: " .. @three>mult(6);
 print "3+10: " .. @three > add (10);
 

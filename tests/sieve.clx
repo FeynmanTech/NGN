@@ -1,4 +1,4 @@
-$limit = 4096;
+$limit = 256;
 $A = {};
 for $index : 2, $limit {
     $A [$index] = true;

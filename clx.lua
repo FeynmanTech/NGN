@@ -3,6 +3,10 @@
 
 cl = {}
 
+cl.GLOBAL_POS = 0
+cl.PRIMARY_POS = 0
+cl.GLOBAL_SRC = ""
+
 src = {}
 src.factorial = [[
     function factorial : num, cval {
@@ -105,7 +109,7 @@ cl.proc["for"] = function(lvars, var, start, stop, step, src)
     stop = tonumber(cl.eval(stop, lvars))
     step = tonumber(cl.eval(step, lvars)) or 1
     while lvars[var] <= stop do
-        cl.parse(src:sub(2, -2), lvars)
+        cl.parse(src:sub(2, -2), lvars, true)
         lvars[var] = lvars[var] + step
     end
 end
@@ -116,7 +120,7 @@ cl.proc["for-default"] = function(lvars, var, start, stop, src)
     lvars[var] = tonumber(cl.eval(start, lvars))
     stop = tonumber(cl.eval(stop, lvars))
     while lvars[var] <= stop do
-        cl.parse(src:sub(2, -2), lvars)
+        cl.parse(src:sub(2, -2), lvars, true)
         lvars[var] = lvars[var] + 1
     end
 end
@@ -126,7 +130,7 @@ cl.key["while"] = "while%s-([^{]-)%s-(%b{});"
 cl.proc["while"] = function(lvars, conditions, src)
     --lvars[var] = start
     while cl.isTrue(conditions, lvars) do
-        cl.parse(src:sub(2, -2), lvars)
+        cl.parse(src:sub(2, -2), lvars, true)
     end
 end
 cl.rank["while"] = 0
@@ -136,7 +140,7 @@ cl.key["if"] = "if%s-([^{]-)%s-(%b{});"
 cl.proc["if"] = function(lvars, conditions, src)
     --lvars[var] = start
     if cl.isTrue(conditions, lvars) then
-        cl.parse(src:sub(2, -2), lvars)
+        cl.parse(src:sub(2, -2), lvars, true)
     end
 end
 cl.rank["if"] = 0
@@ -145,9 +149,9 @@ cl.key["if.-{.-}%s-else%s-%b{}"] = "if%s-([^{]-)%s-(%b{})%s-else%s-(%b{});"
 cl.proc["if.-{.-}%s-else%s-%b{}"] = function(lvars, conditions, src, src2)
     --lvars[var] = start
     if cl.isTrue(conditions, lvars) then
-        cl.parse(src:sub(2, -2), lvars)
+        cl.parse(src:sub(2, -2), lvars, true)
     else
-        cl.parse(src2:sub(2, -2), lvars)
+        cl.parse(src2:sub(2, -2), lvars, true)
     end
 end
 cl.rank["if.-{.-}%s-else%s-%b{}"] = 1
@@ -156,9 +160,9 @@ cl.key["if.-{.-}%s-elseif"] = "if%s-([^{]-)%s-(%b{})%s-(elseif%s-[^}]+%s-%b{}.-;
 cl.proc["if.-{.-}%s-elseif"] = function(lvars, conditions, src, chunk2)
     --lvars[var] = start
     if cl.isTrue(conditions, lvars) then
-        cl.parse(src:sub(2, -2), lvars)
+        cl.parse(src:sub(2, -2), lvars, true)
     else
-        cl.parse(chunk2:sub(5, -1), lvars)
+        cl.parse(chunk2:sub(5, -1), lvars, true)
     end
 end
 cl.rank["if.-{.-}%s-elseif"] = 2
@@ -218,14 +222,14 @@ cl.proc["type"]= function(lvars, name, vars, src)
     end
     for method, args, body in src:gmatch("@(%w+)%s-:%s-([^{]+)(%b{});") do
         t.__src[method] = {args, body:sub(2,-2)}
-        t.__run[method] = function(self, arg) cl.parse(self.__src[method][2], arg) end
+        t.__run[method] = function(self, arg) cl.parse(self.__src[method][2], arg, true) end
     end
     cl.types[name] = t
 end
 cl.rank.typedef = 2
 
-cl.key["new"] = "new%s+([%w_]+)%s-:%s-([%w_]+)%s-(%b());"
-cl.proc["new"] = function(lvars, t, name, args)
+cl.key["new"] = "new%s+([%w_]+)%s-(%b())%s-:%s-([%w_]+)%s-;"
+cl.proc["new"] = function(lvars, t, args, name)
     if cl.types[t] then
         cl.objects[name] = cl.types[t]
         local arg = cl.getArgsFromString(args:sub(2,-2), lvars)
@@ -277,7 +281,7 @@ cl.rank["%@%s-[%w_]+%s->%s-[%w_]+%s-%b()"] = 2
 
 function runMethod(str, lvars)
     _RETURN = nil
-    cl.parse(str, lvars)
+    cl.parse(str, lvars, true)
     return _RETURN
 end
 
@@ -303,7 +307,10 @@ end
 cl.ops["+="] = "$([%w_]+)%s-%+%s-=%s-([^;]+);"
 cl.opProc["+="] = function(lvars, var, val)
     if not cl.vars[var] then
-        clError("$"..var.."+="..val, "Operation on undefined variable "..var)
+        clError("$"..var.."+="..val, "Operation on undefined variable $"..var)
+        return
+    elseif not tonumber(cl.vars[var]) then
+        clError("$"..var.."+="..val, "Operation on non-numeric variable $"..var)
         return
     end
     local res = cl.eval(val, lvars)
@@ -317,10 +324,10 @@ end
 cl.ops["++"] = "$([%w_]+)%s-%+%s-%+%s-;"
 cl.opProc["++"] = function(lvars, var, val)
     if not cl.vars[var] then
-        clError("$"..var.."++", "Operation on undefined variable "..var)
+        clError("$"..var.."++", "Operation on undefined variable $"..var)
         return
     elseif not tonumber(cl.vars[var]) then
-        clError("$"..var.."++", "Numeric operation on variable "..var .. " of non-numeric type " .. type(cl.vars[var]))
+        clError("$"..var.."++", "Numeric operation on variable $"..var .. " of non-numeric type " .. type(cl.vars[var]))
         return
     end
     cl.vars[var] = cl.vars[var] + 1
@@ -329,10 +336,10 @@ end
 cl.ops["-="] = "$([%w_]+)%s-%-%s-=%s-([^;]+);"
 cl.opProc["-="] = function(lvars, var, val)
     if not cl.vars[var] then
-        clError("$"..var.."-="..val, "Operation on undefined variable "..var)
+        clError("$"..var.."-="..val, "Operation on undefined variable $"..var)
         return
     elseif not tonumber(cl.vars[var]) then
-        clError("$"..var.."+="..val, "Numeric operation on variable "..var .. " of non-numeric type " .. type(cl.vars[var]))
+        clError("$"..var.."+="..val, "Numeric operation on variable $"..var .. " of non-numeric type " .. type(cl.vars[var]))
         return
     end
     local res = cl.eval(val, lvars)
@@ -346,10 +353,10 @@ end
 cl.ops["--"] = "$([%w_]+)%s-%-%s-%-%s-;"
 cl.opProc["--"] = function(lvars, var, val)
     if not cl.vars[var] then
-        clError("$"..var.."--", "Operation on undefined variable "..var)
+        clError("$"..var.."--", "Operation on undefined variable $"..var)
         return
     elseif not tonumber(cl.vars[var]) then
-        clError("$"..var.."++", "Numeric operation on variable "..var .. " of non-numeric type " .. type(cl.vars[var]))
+        clError("$"..var.."++", "Numeric operation on variable $"..var .. " of non-numeric type " .. type(cl.vars[var]))
         return
     end
     cl.vars[var] = cl.vars[var] - 1
@@ -358,7 +365,7 @@ end
 cl.ops[".="] = "$([%w_]+)%s-%.%s-=%s-([^;]+);"
 cl.opProc[".="] = function(lvars, var, val)
     if not cl.vars[var] then
-        clError("$"..var..".="..val, "Operation on undefined variable "..var)
+        clError("$"..var..".="..val, "Operation on undefined variable $"..var)
         return
     end
     cl.vars[var] = tostring(cl.vars[var]) .. tostring(cl.eval(val, lvars))
@@ -381,7 +388,7 @@ cl.proc["function"] = function(lvars, name, args, src)
     for i, v in ipairs(a) do
         s = s .. "lvars['" .. v .. "']=" .. v .. "\n"
     end
-    s = s .. "cl.parse([[" .. src:sub(2, -2) .. "]], lvars)\n return _RETURN end"
+    s = s .. "cl.parse([[" .. src:sub(2, -2) .. "]], lvars, true)\n return _RETURN end"
     --print(s)
     local f, err = loadstring(s)
     if f then
@@ -426,17 +433,26 @@ end
 function cl.func.runfile(lvars, filename, is_critical)
     local success = cl.parseFile(filename)
     if is_critical ~= false and not success then
+        cl.ALL_ERR_CRITICAL = true
         clError("runfile(\""..filename.."\")", "Unable to open file for parsing")
     end
     return success
 end
 
 function cl.func.require(lvars, filename)
+    local gp = cl.GLOBAL_POS
+    local pp = cl.PRIMARY_POS
     local success = cl.parseFile(filename)
+    cl.GLOBAL_POS = gp
+    cl.PRIMARY_POS = pp
     if not success then
         clError("runfile(\""..filename.."\")", "Unable to open file for parsing")
     end
     return success
+end
+
+cl.func.ignoreErrors = function(lvars, state)
+    cl.ALL_ERR_CRITICAL = not state
 end
 
 cl.func.lua = function(lvars, s) return loadstring(s:gsub("cl.vars", "({...})[1]"))(cl.vars) end
@@ -448,9 +464,36 @@ end
 
 CL_LOC = ""
 
+cl.ALL_ERR_CRITICAL = true
+cl.ERR_LEN = 30
 function clError(loc, msg)
-    print('Error: line ' .. cl.CurrentLine .. ":" .. cl.CurrentChar .. '\n' .. msg)
-    os.exit()
+    local l, c, lastLine = 1, 0, 0
+    for cc = 1, cl.PRIMARY_POS do
+        if cl.GLOBAL_SRC:sub(cc, cc) == "\n" then
+            l = l + 1
+            lastLine = cc
+        end
+    end
+    c = cl.PRIMARY_POS - lastLine
+    local sc, ec = math.max(1, cl.PRIMARY_POS - cl.ERR_LEN), math.min(#cl.GLOBAL_SRC, cl.PRIMARY_POS + cl.ERR_LEN)
+    local startEllipsis, endEllipsis = math.ceil(1/(cl.PRIMARY_POS-1)), 1
+    for _sc = math.max(1, cl.PRIMARY_POS - cl.ERR_LEN), cl.PRIMARY_POS do
+        if cl.GLOBAL_SRC:sub(_sc, _sc) == "\n" then
+            sc = _sc
+            startEllipsis = 0
+        end
+    end
+    for _ec = math.min(#cl.GLOBAL_SRC, cl.PRIMARY_POS + cl.ERR_LEN), cl.PRIMARY_POS, -1 do
+        if cl.GLOBAL_SRC:sub(_ec, _ec) == "\n" then
+            ec = _ec
+            endEllipsis = 0
+        end
+    end
+    local context = (("..."):rep(startEllipsis)..cl.GLOBAL_SRC:sub(sc, ec)..("..."):rep(endEllipsis)):gsub("\n", "")
+    print('Error: line ' .. l .. ":" .. c .. '\n' .. context .. "\n" .. msg .. "\n")
+    if cl.ALL_ERR_CRITICAL then
+        os.exit()
+    end
 end
 
 function cl.eval(statement, lvars)
@@ -480,7 +523,7 @@ function cl.isTrue(statement, lvars)
     return cl.eval(statement, lvars)
 end
     
-function cl.parse(str, lvars)
+function cl.parse(str, lvars, isSubParse)
     str = str .. "\n"
     lvars = lvars or {}
     while str:match("  ") do
@@ -498,6 +541,13 @@ function cl.parse(str, lvars)
             cl.CurrentChar = cl.CurrentChar + 1
         end
         local active = str:sub(pos, str:find("[^%w_]", pos) -1)
+        if not isSubParse then
+            cl.GLOBAL_POS = pos
+            cl.PRIMARY_POS = pos
+            cl.GLOBAL_SRC = str
+        else
+            cl.PRIMARY_POS = cl.GLOBAL_POS + pos
+        end
         if str:sub(pos, pos+1):find("%s") then
             pos = pos + 1
         elseif str:sub(pos, pos) == "$" then
@@ -538,10 +588,6 @@ function cl.parse(str, lvars)
                 match = true
             end
         end
-        --[[
-        _LOG = (_LOG or "") .. str:sub(1, pos-1) .. "#" .. str:sub(pos+1, -1) .. "\n" .. ("-"):rep(50) .. "\n"
-        saveProjectTab("Log", "--[=[" .. _LOG .. "--]=]")
-        --]]
     end
 end
 
