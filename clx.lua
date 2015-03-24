@@ -244,7 +244,7 @@ cl.proc["new"] = function(lvars, t, args, name)
         end
         cl.objects[name].__type = t
     else
-        clError("new " .. t .. ":" .. name .. args, "Use of undeclared type " .. t)
+        clError("Use of undeclared type " .. t)
     end
 end
 
@@ -269,12 +269,9 @@ cl.proc["%@%s-[%w_]+%s->%s-[%w_]+%s-%b()"] = function(lvars, obj, method, args)
         end
         cl.objects[obj].__run[method](cl.objects[obj], arg)
     elseif cl.objects[obj] and not cl.objects[obj].__src[method] then
-        clError(
-            obj..">"..method..args, 
-            "Attempt to call undefined method "..method.." of "..cl.objects[obj].__type.." "..obj
-        )
+        clError("Attempt to call undefined method "..method.." of "..cl.objects[obj].__type.." "..obj)
     else
-        clError(obj..">"..method..args, "Attempt to call method "..method.." of null object")
+        clError("Attempt to call method "..method.." of null object")
     end
 end
 cl.rank["%@%s-[%w_]+%s->%s-[%w_]+%s-%b()"] = 2
@@ -307,15 +304,15 @@ end
 cl.ops["+="] = "$([%w_]+)%s-%+%s-=%s-([^;]+);"
 cl.opProc["+="] = function(lvars, var, val)
     if not cl.vars[var] then
-        clError("$"..var.."+="..val, "Operation on undefined variable $"..var)
+        clError("Operation on undefined variable $"..var)
         return
     elseif not tonumber(cl.vars[var]) then
-        clError("$"..var.."+="..val, "Operation on non-numeric variable $"..var)
+        clError("Operation on non-numeric variable $"..var)
         return
     end
     local res = cl.eval(val, lvars)
     if not(tonumber(res)) then
-        clError("$"..var.."+="..val, "Operation on numeric $" .. var .. " using non-numeric value")
+        clError("Operation on numeric $" .. var .. " using non-numeric value")
         return
     end
     cl.vars[var] = cl.vars[var] + cl.eval(val, lvars)
@@ -324,10 +321,10 @@ end
 cl.ops["++"] = "$([%w_]+)%s-%+%s-%+%s-;"
 cl.opProc["++"] = function(lvars, var, val)
     if not cl.vars[var] then
-        clError("$"..var.."++", "Operation on undefined variable $"..var)
+        clError("Operation on undefined variable $"..var)
         return
     elseif not tonumber(cl.vars[var]) then
-        clError("$"..var.."++", "Numeric operation on variable $"..var .. " of non-numeric type " .. type(cl.vars[var]))
+        clError("Numeric operation on variable $"..var .. " of non-numeric type " .. type(cl.vars[var]))
         return
     end
     cl.vars[var] = cl.vars[var] + 1
@@ -336,15 +333,15 @@ end
 cl.ops["-="] = "$([%w_]+)%s-%-%s-=%s-([^;]+);"
 cl.opProc["-="] = function(lvars, var, val)
     if not cl.vars[var] then
-        clError("$"..var.."-="..val, "Operation on undefined variable $"..var)
+        clError("Operation on undefined variable $"..var)
         return
     elseif not tonumber(cl.vars[var]) then
-        clError("$"..var.."+="..val, "Numeric operation on variable $"..var .. " of non-numeric type " .. type(cl.vars[var]))
+        clError("Numeric operation on variable $"..var .. " of non-numeric type " .. type(cl.vars[var]))
         return
     end
     local res = cl.eval(val, lvars)
     if not(tonumber(res)) then
-        clError("$"..var.."-="..val, "Operation on numeric $" .. var .. " using non-numeric value")
+        clError("Operation on numeric $" .. var .. " using non-numeric value")
         return
     end
     cl.vars[var] = cl.vars[var] + cl.eval(val, lvars)
@@ -353,10 +350,10 @@ end
 cl.ops["--"] = "$([%w_]+)%s-%-%s-%-%s-;"
 cl.opProc["--"] = function(lvars, var, val)
     if not cl.vars[var] then
-        clError("$"..var.."--", "Operation on undefined variable $"..var)
+        clError("Operation on undefined variable $"..var)
         return
     elseif not tonumber(cl.vars[var]) then
-        clError("$"..var.."++", "Numeric operation on variable $"..var .. " of non-numeric type " .. type(cl.vars[var]))
+        clError("Numeric operation on variable $"..var .. " of non-numeric type " .. type(cl.vars[var]))
         return
     end
     cl.vars[var] = cl.vars[var] - 1
@@ -365,7 +362,7 @@ end
 cl.ops[".="] = "$([%w_]+)%s-%.%s-=%s-([^;]+);"
 cl.opProc[".="] = function(lvars, var, val)
     if not cl.vars[var] then
-        clError("$"..var..".="..val, "Operation on undefined variable $"..var)
+        clError("Operation on undefined variable $"..var)
         return
     end
     cl.vars[var] = tostring(cl.vars[var]) .. tostring(cl.eval(val, lvars))
@@ -434,7 +431,7 @@ function cl.func.runfile(lvars, filename, is_critical)
     local success = cl.parseFile(filename)
     if is_critical ~= false and not success then
         cl.ALL_ERR_CRITICAL = true
-        clError("runfile(\""..filename.."\")", "Unable to open file for parsing")
+        clError("Unable to open file for parsing")
     end
     return success
 end
@@ -446,7 +443,7 @@ function cl.func.require(lvars, filename)
     cl.GLOBAL_POS = gp
     cl.PRIMARY_POS = pp
     if not success then
-        clError("runfile(\""..filename.."\")", "Unable to open file for parsing")
+        clError("Unable to open file for parsing")
     end
     return success
 end
@@ -466,7 +463,7 @@ CL_LOC = ""
 
 cl.ALL_ERR_CRITICAL = true
 cl.ERR_LEN = 30
-function clError(loc, msg)
+function clError(msg)
     local l, c, lastLine = 1, 0, 0
     for cc = 1, cl.PRIMARY_POS do
         if cl.GLOBAL_SRC:sub(cc, cc) == "\n" then
