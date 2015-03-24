@@ -14,3 +14,9 @@ $non_number += 2;
 new non_type() : instance;
 
 @non_object > test();
+
+type Type : $stuff {};
+
+new Type(2) : instance;
+
+@instance > non_method();

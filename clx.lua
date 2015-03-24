@@ -218,7 +218,7 @@ cl.proc["type"]= function(lvars, name, vars, src)
     t.__args = vars
     t.__run = {}
     for v in (vars..","):gmatch("([^,]+)%s-,") do
-        t.__vars[v:match("(%w+)%s-=%s-[^,+]")] = v:match("%w+%s-=%s-([^,-])")
+        t.__vars[v:match("(%w+)%s-=%s-[^,+]") or v] = v:match("%w+%s-=%s-([^,-])")
     end
     for method, args, body in src:gmatch("@(%w+)%s-:%s-([^{]+)(%b{});") do
         t.__src[method] = {args, body:sub(2,-2)}
