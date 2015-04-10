@@ -22,10 +22,46 @@ patterns:
   match: \b(function)\s+([a-zA-Z0-9_]+)\s*([:]+)\s*([A-Za-z0-9_\$,\s]+)
   name: meta.function.cl
 - captures:
+    '1': {name: keyword.control.cl}
+    '2': {name: entity.name.function.cl}
+    '3': {name: punctuation.definition.parameters.begin.cl}
+    '4': {name: punctuation.definition.parameters.cl}
+    '5': {name: punctuation.definition.parameters.begin.cl}
+    '6': {name: punctuation.definition.parameters.begin.cl}
+    '7': {name: variable.parameter.function.cl}
+  match: \b(new)\s+([a-zA-Z0-9_]+)\s-(\()(.+)(\))\s*([:])\s*([A-Za-z0-9_\$\,\s]+)
+  name: meta.function.cl
+- captures:
     '1': {name: entity.name.function.cl}
     '2': {name: punctuation.definition.parameters.begin.cl}
     '3': {name: variable.parameter.function.cl}
   match: \b([\@a-zA-Z0-9_]+)\s*([:]+)\s*([A-Za-z0-9_\$,\s]+)
+  name: meta.function.cl
+- captures:
+    '1': {name: entity.name.function.cl}
+    '2': {name: punctuation.definition.parameters.begin.cl}
+    '3': {name: variable.parameter.function.cl}
+  match: \b([\@a-zA-Z0-9_]+)\s*(\>)\s*([A-Za-z0-9_\$,\s]+)
+  name: meta.function.cl
+- captures:
+    '1': {name: entity.name.function.cl}
+    '2': {name: keyword.operator.cl}
+    '3': {name: entity.name.function.cl}
+  match: \b(\w+)\s*(\-\>)\s*([A-Za-z0-9_\$,\s]+)
+  name: meta.function.cl
+- captures:
+    '1': {name: support.function.cl}
+    '2': {name: entity.name.function.cl}
+  match: \b(load)\s*([A-Za-z0-9_\$,\s]+)
+  name: meta.function.cl
+- captures:
+    '1': {name: support.function.cl}
+    '2': {name: punctuation.definition.parameters.begin.cl}
+    '3': {name: variable.parameter.function.cl}
+    '4': {name: punctuation.definition.parameters.end.cl}
+    '5': {name: keyword.operator.cl}
+    '6': {name: entity.name.function.cl}
+  match: \b(open)\s+(\<)(.+)(\>)\s*([:]+)\s*([A-Za-z0-9_\$,\s]+)
   name: meta.function.cl
 - {match: '(?<![\d.])\s0x[a-fA-F\d]+|\b\d+(\.\d+)?([eE]-?\d+)?|\.\d+([eE]-?\d+)?',
   name: constant.numeric.cl}
@@ -64,7 +100,7 @@ patterns:
   match: (\#\#).*$\n?
   name: comment.line.cl
 - {match: \b(for|while|if|else|elseif|return|def|function|type|new)\b, name: keyword.control.cl}
-- {match: \b(print|set)\b, name: support.function.cl}
+- {match: \b(print|set|open|load)\b, name: support.function.cl}
 - {match: '(\$)([A-Za-z0-9_]+)', name: entity.name.function.cl}
 - {match: '(\@)([A-Za-z0-9_]+)', name: entity.name.function.cl}
 - captures:

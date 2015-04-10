@@ -7,6 +7,7 @@ cl.GLOBAL_POS = 0
 cl.PRIMARY_POS = 0
 cl.GLOBAL_SRC = ""
 
+-- Basic demos
 src = {}
 src.factorial = [[
     function factorial : num, cval {
@@ -99,6 +100,8 @@ cl.types = {}
 
 cl.objects = {}
 
+cl.handles = {}
+
 cl.CurrentLine = 1
 cl.CurrentChar = 1
 
@@ -106,8 +109,15 @@ cl.CurrentChar = 1
 cl.key["for"] = "for%s-%$(%S+)%s-:%s-([^,]-),%s-([^,{]-),%s-([^{]-)%s-(%b{});"
 cl.proc["for"] = function(lvars, var, start, stop, step, src)
     lvars[var] = tonumber(cl.eval(start, lvars))
+    local _stop, _step = stop, step
     stop = tonumber(cl.eval(stop, lvars))
-    step = tonumber(cl.eval(step, lvars)) or 1
+    if not stop then
+        clError("Non-numeric limit: " .. _stop)
+    end
+    step = tonumber(cl.eval(step, lvars))
+    if not step then
+        clError("Non-numeric step: " .. _step)
+    end
     while lvars[var] <= stop do
         cl.parse(src:sub(2, -2), lvars, true)
         lvars[var] = lvars[var] + step
@@ -118,13 +128,37 @@ cl.rank["for"] = 0
 cl.key["for-default"] = "for%s-%$(%S+)%s-:%s-([^,]-),%s-([^,{]-)%s-(%b{});"
 cl.proc["for-default"] = function(lvars, var, start, stop, src)
     lvars[var] = tonumber(cl.eval(start, lvars))
+    local _stop = stop
     stop = tonumber(cl.eval(stop, lvars))
+    if not stop then
+        clError("Non-numeric limit: " .. _stop)
+    end
     while lvars[var] <= stop do
         cl.parse(src:sub(2, -2), lvars, true)
         lvars[var] = lvars[var] + 1
     end
 end
 cl.rank["for-default"] = 0
+
+-- for $var : start, stop [ statement; ] { statement; };
+cl.key["for-dynamic"] = "for%s-%$(%S+)%s-:%s-([^,]-),%s-([^%[]-)%s-(%b%[%])%s-(%b{});"
+cl.proc["for-dynamic"] = function(lvars, var, start, stop, step, src)
+    lvars[var] = tonumber(cl.eval(start, lvars))
+    local _stop, _step = stop, step
+    stop = tonumber(cl.eval(stop, lvars))
+    if not stop then
+        clError("Non-numeric limit: " .. _stop)
+    end
+    step = tonumber(cl.eval(step, lvars))
+    if not step then
+        clError("Non-numeric step: " .. _step)
+    end
+    while lvars[var] <= stop do
+        cl.parse(src:sub(2, -2), lvars, true)
+        cl.parse(step, lvars, true)
+    end
+end
+cl.rank["for-dynamic"] = 0
 -- while conditions { statement; };
 cl.key["while"] = "while%s-([^{]-)%s-(%b{});"
 cl.proc["while"] = function(lvars, conditions, src)
@@ -197,6 +231,22 @@ cl.proc["write"] = function(lvars, stuff)
 end
 cl.rank["write"] = 2
 
+cl.key["open"] = "open%s-(%b<>)%s-:%s-(%w+)%s-;"
+cl.proc["open"] = function(lvars, file, var)
+    cl.handles[var] = io.open(cl.eval(file:sub(2, -2), lvars), "r+")
+end
+cl.rank["open"] = 2
+
+cl.key["file-read"] = "(%w+)%s-->%s-%$?(%w+)%s-;"
+cl.proc["file-read"] = function(lvars, handle, var)
+    if cl.handles[handle] then
+        cl.vars[var] = cl.handles[handle]:read("*a")
+    else
+        clError("Attempt to read contents of null file handle")
+    end
+end
+cl.rank["file-read"] = 1
+
 --[[
 EXAMPLE TYPEDEF:
 local name = {}
@@ -245,6 +295,14 @@ cl.proc["new"] = function(lvars, t, args, name)
         cl.objects[name].__type = t
     else
         clError("Use of undeclared type " .. t)
+    end
+end
+
+cl.key["load"] = "load%s+(.-);"
+cl.proc["load"] = function(lvars, lib)
+    local s, err = pcall(dofile, lib .. ".lib.lua")
+    if not s then
+        clError("Unable to load library")
     end
 end
 
@@ -528,7 +586,7 @@ function cl.parse(str, lvars, isSubParse)
     end
     str = str:gsub("%[#.-#%]", "")
     str = str:gsub("##.-\n", "")
-    local pos = 0
+    local pos = 1
     local p = true
     while (pos < #str) and p do
         if str:sub(pos, pos) == "\n" then
@@ -545,14 +603,14 @@ function cl.parse(str, lvars, isSubParse)
         else
             cl.PRIMARY_POS = cl.GLOBAL_POS + pos
         end
-        if str:sub(pos, pos+1):find("%s") then
+        if str:sub(pos, pos):find("%s") then
             pos = pos + 1
         elseif str:sub(pos, pos) == "$" then
             for i, v in pairs(cl.ops) do
                 if str:find(v, pos) == pos then
                     local opStr = trim(str:sub(pos, str:find(";", pos + 1)))
                     cl.opProc[i](lvars, opStr:match(cl.ops[i]))
-                    pos = str:find(";", pos + 1)
+                    pos = str:find(";", pos + 1) + 1
                 end
             end
         elseif cl.key[active] and str:find(cl.key[active], pos-1) == pos then
@@ -576,6 +634,7 @@ function cl.parse(str, lvars, isSubParse)
                 end
             end
             if r == -1 then
+                -- clError("Unexpected symbol " .. active)
                 pos = pos + 1
             else
                 --print("match")
