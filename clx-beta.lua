@@ -159,31 +159,6 @@ cl.proc["for-dynamic"] = function(lvars, var, start, stop, step, src)
     end
 end
 cl.rank["for-dynamic"] = 0
-
-cl.key["for-iterator"] = "for%s+%$(%w+)%s-in%s-(.-)%s-(%b{});"
-cl.proc["for-iterator"] = function(lvars, var, i, src)
-    local v = cl.eval(i, lvars)
-    print(v)
-    if type(v) == "table" then
-        for _, v in pairs(v) do
-            lvars[var] = v
-            cl.parse(src, lvars, true)
-        end
-    elseif type(v) == "string" then
-        for c = 1, #v do
-            lvars[var] = v:sub(c,c)
-            cl.parse(src, lvars, true)
-        end
-    elseif type(v) == "number" then
-        for n = 1, math.ceil(math.log(v, 2)) do
-            lvars[var] = v >> n & 1
-            cl.parse(src, lvars, true)
-        end
-    else
-        clError("Invalid value for iterator")
-    end
-end
-cl.rank["for-iterator"] = 1
 -- while conditions { statement; };
 cl.key["while"] = "while%s-([^{]-)%s-(%b{});"
 cl.proc["while"] = function(lvars, conditions, src)
@@ -262,7 +237,7 @@ cl.proc["open"] = function(lvars, file, var)
 end
 cl.rank["open"] = 2
 
-cl.key["file-read"] = "(%w+)%s-->%s-%$?(%w+)%s-;"
+cl.key["file-read"] = "(%w+)%s-%->%s-%$?(%w+)%s-;"
 cl.proc["file-read"] = function(lvars, handle, var)
     if cl.handles[handle] then
         cl.vars[var] = cl.handles[handle]:read("*a")
@@ -271,6 +246,20 @@ cl.proc["file-read"] = function(lvars, handle, var)
     end
 end
 cl.rank["file-read"] = 1
+
+cl.key["file-write"] = "(%w+)%s-<%-%s-%$?(%w+)%s-;"
+cl.proc["file-write"] = function(lvars, handle, var)
+    local contents = cl.eval(var, lvars)
+    if not contents then
+        clError("Attempt to write null value " .. var .. " to file handle " .. handle)
+    end
+    if cl.handles[handle] then
+        cl.handles[handle]:write(cl.eval(var, lvars) or "")
+    else
+        clError("Attempt to write to null file handle")
+    end
+end
+cl.rank["file-write"] = 1
 
 --[[
 EXAMPLE TYPEDEF:
@@ -303,8 +292,8 @@ cl.proc["type"]= function(lvars, name, vars, src)
 end
 cl.rank.typedef = 2
 
-cl.key["new"] = "new%s+([%w_]+)%s-(%b())%s-:%s-([%w_]+)%s-;"
-cl.proc["new"] = function(lvars, t, args, name)
+cl.key["new"] = "new%s+([%w_]+)%s-:%s-([%w_]+)%s-(%b())%s-;"
+cl.proc["new"] = function(lvars, t, name, args)
     if cl.types[t] then
         cl.objects[name] = cl.types[t]
         local arg = cl.getArgsFromString(args:sub(2,-2), lvars)
