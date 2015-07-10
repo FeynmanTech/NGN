@@ -34,6 +34,10 @@ For loops:
     for $varname : $start, $end, $step {
         ## do stuff
     };
+    ## Dynamic-step for loop
+    for $varname : $start, $end [$varname+=$varname/2;] {
+        ## do stuff
+    };
 While loops:
 
     while $conditions==true {
@@ -80,3 +84,22 @@ or this:
 
     print "stuff";
 Those methods are equivalent, although the second is more prone to bugs.
+### File I/O ###
+File handles are uncomplicated to create - once initialized, they can be used to read from or write to a file any number of times. They can be closed, but there is no need to, as Lua does so automatically.
+
+To create a file handle, use *open*:
+
+    open <"file_name"> : handle;
+The contents of the resulting handle can be read into a string:
+
+    handle -> $str;
+
+    ## The $ is optional, so
+    ## handle -> str;
+    ## would work just as well.
+In that example, all the text contained in *handle*'s file is copied to *$str*.
+
+Writing to a file is similar:
+
+    handle <- "content to be written";
+The content does not have to be a string - any data type or variable can be written except null values.

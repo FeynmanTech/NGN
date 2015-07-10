@@ -237,7 +237,7 @@ cl.proc["open"] = function(lvars, file, var)
 end
 cl.rank["open"] = 2
 
-cl.key["file-read"] = "(%w+)%s-->%s-%$?(%w+)%s-;"
+cl.key["file-read"] = "(%w+)%s-%->%s-%$?(%w+)%s-;"
 cl.proc["file-read"] = function(lvars, handle, var)
     if cl.handles[handle] then
         cl.vars[var] = cl.handles[handle]:read("*a")
@@ -246,6 +246,20 @@ cl.proc["file-read"] = function(lvars, handle, var)
     end
 end
 cl.rank["file-read"] = 1
+
+cl.key["file-write"] = "(%w+)%s-<%-%s-%$?(%w+)%s-;"
+cl.proc["file-write"] = function(lvars, handle, var)
+    local contents = cl.eval(var, lvars)
+    if not contents then
+        clError("Attempt to write null value " .. var .. " to file handle " .. handle)
+    end
+    if cl.handles[handle] then
+        cl.handles[handle]:write(cl.eval(var, lvars) or "")
+    else
+        clError("Attempt to write to null file handle")
+    end
+end
+cl.rank["file-write"] = 1
 
 --[[
 EXAMPLE TYPEDEF:
@@ -278,8 +292,8 @@ cl.proc["type"]= function(lvars, name, vars, src)
 end
 cl.rank.typedef = 2
 
-cl.key["new"] = "new%s+([%w_]+)%s-(%b())%s-:%s-([%w_]+)%s-;"
-cl.proc["new"] = function(lvars, t, args, name)
+cl.key["new"] = "new%s+([%w_]+)%s-:%s-([%w_]+)%s-(%b())%s-;"
+cl.proc["new"] = function(lvars, t, name, args)
     if cl.types[t] then
         cl.objects[name] = cl.types[t]
         local arg = cl.getArgsFromString(args:sub(2,-2), lvars)
@@ -454,6 +468,23 @@ cl.proc["function"] = function(lvars, name, args, src)
     end
 end
 
+cl.key["macro"] = "macro%s-:%s-(%b\'\')%s-(%b[])%s-(%b{})%s-;"
+cl.proc["macro"] = function(lvars, pattern, args, code)
+    local arg = {}
+    for a in (args:sub(2, -2) .. ","):gmatch("(.-),") do
+        table.insert(arg, trim(a))
+    end
+    cl.key[pattern] = pattern:sub(2, -2)
+    cl.proc[pattern] = function(lvars, ...)
+        for i, v in ipairs(arg) do
+            lvars[v:sub(2, -1)] = ({...})[i]
+        end
+        cl.parse(code, lvars, true)
+    end
+    cl.rank[pattern] = 1
+end
+cl.rank["macro"] = 1
+
 cl.func.print = function(lvars, ...) 
     local t = {}
     for i, v in ipairs{...} do
@@ -483,6 +514,9 @@ cl.func.simplifyType = function(lvars, str)
     local s, val = pcall(f)
     if not(err) then value = val else value = str end
     return value
+end
+cl.func.value = function(lvars, str)
+    return lvars[str] or cl.vars[str] or str
 end
 
 function cl.func.runfile(lvars, filename, is_critical)
