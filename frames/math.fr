@@ -1,0 +1,25 @@
+local function toBits(num)
+    -- returns a table of bits, least significant first.
+    local t={} -- will contain the bits
+    while num>0 do
+        rest=math.fmod(num,2)
+        t[#t+1]=rest
+        num=(num-rest)/2
+    end
+    return t
+end
+cl.key["bitloop"] = "bitloop%s-(%S+)%s-:%s-%$([^{]+)%s-(%b{});"
+cl.proc["bitloop"] = function(lvars, n, var, code)
+	local v = cl.eval(n, lvars)
+	if tonumber(v) then
+		local t = toBits(tonumber(v))
+		for i, v in ipairs(t) do
+			lvars[trim(var)] = v
+			cl.parse(code:sub(2, -2), lvars, true)
+		end
+	else
+		clError("Invalid value for iterator")
+	end
+end
+cl.rank["bitloop"] = 1
+print("Math library loaded")

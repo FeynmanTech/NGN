@@ -163,7 +163,6 @@ cl.rank["for-dynamic"] = 0
 cl.key["for-iterator"] = "for%s+%$(%w+)%s-in%s-(.-)%s-(%b{});"
 cl.proc["for-iterator"] = function(lvars, var, i, src)
     local v = cl.eval(i, lvars)
-    print(v)
     if type(v) == "table" then
         for _, v in pairs(v) do
             lvars[var] = v
@@ -174,16 +173,12 @@ cl.proc["for-iterator"] = function(lvars, var, i, src)
             lvars[var] = v:sub(c,c)
             cl.parse(src, lvars, true)
         end
-    elseif type(v) == "number" then
-        for n = 1, math.ceil(math.log(v, 2)) do
-            lvars[var] = v >> n & 1
-            cl.parse(src, lvars, true)
-        end
     else
         clError("Invalid value for iterator")
     end
 end
 cl.rank["for-iterator"] = 1
+
 -- while conditions { statement; };
 cl.key["while"] = "while%s-([^{]-)%s-(%b{});"
 cl.proc["while"] = function(lvars, conditions, src)
@@ -358,6 +353,21 @@ cl.proc["%@%s-[%w_]+%s->%s-[%w_]+%s-%b()"] = function(lvars, obj, method, args)
     end
 end
 cl.rank["%@%s-[%w_]+%s->%s-[%w_]+%s-%b()"] = 2
+
+cl.key["loadframe"] = "loadframe%s-(%b\"\")%s-;"
+cl.proc["loadframe"] = function(lvars, filename)
+    --local gp = cl.GLOBAL_POS
+    --local pp = cl.PRIMARY_POS
+    local f = io.open(filename:sub(2, -2))
+    local success = cl.loadframe(f and f:read("*all") or nil)
+    --cl.GLOBAL_POS = gp
+    --cl.PRIMARY_POS = pp
+    if not success then
+        clError("Unable to open file for parsing")
+    end
+    return success
+end
+cl.rank["loadframe"] = 1
 
 function runMethod(str, lvars)
     _RETURN = nil
@@ -562,6 +572,21 @@ getFunc = function(n)
     return cl.func[n] 
 end
 
+function cl.loadframe(src)
+    if src then
+        local f, err = loadstring(src)
+        if f then
+            f()
+            return true
+        else
+            print(err)
+            return false
+        end
+    else
+        return false
+    end
+end
+
 CL_LOC = ""
 
 cl.ALL_ERR_CRITICAL = true
@@ -658,7 +683,7 @@ function cl.parse(str, lvars, isSubParse)
                     pos = str:find(";", pos + 1) + 1
                 end
             end
-        elseif cl.key[active] and str:find(cl.key[active], pos-1) == pos then
+        elseif cl.key[active] and cl.proc[active] and str:find(cl.key[active], pos-1) == pos then
             local b, e = str:find(cl.key[active], pos-1)
             cl.proc[active](lvars or {}, str:match(cl.key[active], pos-1))
             pos = pos + e - b
@@ -672,7 +697,7 @@ function cl.parse(str, lvars, isSubParse)
             for i, v in pairs(cl.key) do
                 local b, e = str:find(v, pos-1)
                 if (b == pos) and e then
-                    if cl.rank[i] > r then
+                    if (cl.rank[i] or 0) > r then
                         r = cl.rank[i]
                         match = i
                     end
@@ -684,7 +709,7 @@ function cl.parse(str, lvars, isSubParse)
             else
                 --print("match")
                 local b, e = str:find(cl.key[match], pos-1)
-                cl.proc[match](lvars or {}, str:match(cl.key[match], pos-1))
+                if cl.proc[match] then cl.proc[match](lvars or {}, str:match(cl.key[match], pos-1)) end
                 pos = pos + e - b
                 match = true
             end

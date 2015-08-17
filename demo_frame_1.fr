@@ -1,0 +1,6 @@
+cl.key["until"] = "until%s-(.-)%s-do%s-(%b{})};"
+cl.proc["until"] = function(lvars, statement, block)
+	while cl.eval(lvars, statement) do
+		cl.parse(block)
+	end
+end
