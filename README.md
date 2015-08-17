@@ -103,3 +103,24 @@ Writing to a file is similar:
 
     handle <- "content to be written";
 The content does not have to be a string - any data type or variable can be written except null values.
+### Frames ###
+You can modify the behavior of the language itself with frames - Lua code that defines new operators and syntax defititions. To load a frame, use
+
+    loadframe "filename.fr";
+On load, the code inside *filename.fr* will be run as raw Lua code - this feature can technically be used to run code as well as create frames, and doing so is not discouraged.
+### Language Extensions ###
+There are three components to a syntax definition: key, proc, and rank. The key is the pattern used to recognize the new syntax, proc is a function used to execute the chunk of code being handled, and rank is used when comparing your key to another syntax definition in case of ambiguity. For example, if you were writing a new type of for loop that could be interpreted as one of the standard loops, you would want to give it a rank of at least 2 or 3 to be sure that it would be interpreted the way you intend.
+
+When defining a key, remember to put variable components in parentheses so they will be passed to your proc handler.
+For example, if you were defining a syntax object that would take 3 arguments and print them, you would use something like this for your key:
+
+    cl.key.print3 = "tripleprint (.-), (.-), and (.-);"
+Of course, that key is just an example - if you were to actually do that, you would want to use %s- rather than single spaces for stylistic flexibility.
+
+When a syntax object is parsed, its proc function is called with a local variable table, and everything in the key enclosed in parentheses. The proc function for the above key, for example, would look like this:
+
+    cl.proc.print3 = function(lvars, a, b, c)
+        print(a)
+        print(b)
+        print(c)
+    end
