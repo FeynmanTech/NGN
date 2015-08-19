@@ -1,6 +1,6 @@
 ![alt tag](img/types.png)
 
-I wrote this in about a day because I was too tired and stressed to do actual work, so don't be surprised if it's extremely buggy and/or badly-written. If you find any bugs/extremely bad writing that look fixable, please tell me; the hardest part about solving problems is not how to fix the issue, but how to find it.
+This was originally created as a small side project to pass some time, and although it's grown past that by now, it's nowhere near perfect. If you find any bugs that look fixable, please tell me; the hardest part about solving problems is not how to fix the issue, but how to find it.
 # Syntax #
 ### Comments ###
 Single-line comments are done with a pair of '#':
