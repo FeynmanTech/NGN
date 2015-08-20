@@ -1,5 +1,7 @@
 ![alt tag](img/types.png)
 
+<a href="javascript:document.getElementsByTagName('body')[0].appendChild(document.createElement('script')).setAttribute('src','//geekli.st/javascript/bookmarklet/bookmarklet.js')"><img src="//geekli.st/images/assets/GeekIt_wFace.png"></a>
+
 This was originally created as a small side project to pass some time, and although it's grown past that by now, it's nowhere near perfect. If you find any bugs that look fixable, please tell me; the hardest part about solving problems is not how to fix the issue, but how to find it.
 # Syntax #
 ### Comments ###
