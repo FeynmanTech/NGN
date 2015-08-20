@@ -221,6 +221,27 @@ cl.proc["if.-{.-}%s-elseif"] = function(lvars, conditions, src, chunk2)
 end
 cl.rank["if.-{.-}%s-elseif"] = 2
 
+cl.key.select = "select%s-(%b{})%s-;"
+cl.proc.select = function(lvars, code)
+    for c, s in code:sub(2,-2):gmatch("(.-)(%b{});") do
+        if cl.isTrue(trim(c), lvars) then
+            cl.parse(trim(s):sub(2,-2), lvars, true)
+            break
+        end
+    end
+end
+cl.rank.select = 1
+
+cl.key.selectall = "selectall%s-(%b{})%s-;"
+cl.proc.selectall = function(lvars, code)
+    for c, s in code:sub(2,-2):gmatch("(.-)(%b{});") do
+        if cl.isTrue(trim(c), lvars) then
+            cl.parse(trim(s):sub(2,-2), lvars, true)
+        end
+    end
+end
+cl.rank.selectall = 2
+
 cl.key["return"] = "return(.-);"
 cl.proc["return"] = function(lvars, args)
     --print("Returning...")
