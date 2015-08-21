@@ -141,7 +141,7 @@ end
 cl.rank["for-default"] = 0
 
 -- for $var : start, stop [ statement; ] { statement; };
-cl.key["for-dynamic"] = "for%s-%$(%S+)%s-:%s-([^,]-),%s-([^%[]-)%s-(%b%[%])%s-(%b{});"
+cl.key["for-dynamic"] = "for%s-%$(%S+)%s-:%s-([^,]-),%s-([^;]-);%s-(%b%[%])%s-(%b{});"
 cl.proc["for-dynamic"] = function(lvars, var, start, stop, step, src)
     lvars[var] = tonumber(cl.eval(start, lvars))
     local _stop, _step = stop, step
