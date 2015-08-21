@@ -63,7 +63,7 @@ For loops:
         ## do stuff
     };
     ## Dynamic-step for loop
-    for $varname : $start, $end [$varname+=$varname/2;] {
+    for $varname : $start, $end; [$varname+=$varname/2;] {
         ## do stuff
     };
 While loops:
