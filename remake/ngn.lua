@@ -99,7 +99,36 @@ ngn.tokens = {
 ngn.rules = {
 {"<assignment:(.-),(.-)>", function(lvars, var, val) 
     ngn.vars[var] = ngn.eval(val, lvars) 
-    print('"' .. var .. ' = "' .. val .. '"')
+end},
+{"<add:(.-),(.-)>", function(lvars, var, val) 
+    ngn.vars[var] = ngn.vars[var] + ngn.eval(val, lvars) 
+end},
+{"<subtract:(.-),(.-)>", function(lvars, var, val) 
+    ngn.vars[var] = ngn.vars[var] - ngn.eval(val, lvars) 
+end},
+{"<multiply:(.-),(.-)>", function(lvars, var, val) 
+    ngn.vars[var] = ngn.vars[var] * ngn.eval(val, lvars) 
+end},
+{"<divide:(.-),(.-)>", function(lvars, var, val) 
+    ngn.vars[var] = ngn.vars[var] / ngn.eval(val, lvars) 
+end},
+{"<increment:(.-)>", function(lvars, var) 
+    ngn.vars[var] = ngn.vars[var] + 1
+end},
+{"<decrement:(.-)>", function(lvars, var) 
+    ngn.vars[var] = ngn.vars[var] - 1
+end},
+{"<functioncall:print,%((.-)%)>", function(lvars, args) 
+    local o = {}
+    for i, v in ipairs(ngn.args(args, lvars)) do table.insert(o, ngn.eval(v, lvars)) end
+    print(table.concat(o, "\t"))
+end},
+{"<for:%(%s-%$(%w+)%s*=%s*(.-),%s*(.-)%s*%),(%b{})>", function(lvars, var, start, stop, code) 
+    start, stop = ngn.eval(start, lvars), ngn.eval(stop, lvars)
+    for n = start, stop do
+        lvars[var] = n
+        ngn.run(ngn.tokenize(code:sub(2,-2)), lvars)
+    end
 end}
 }
 
