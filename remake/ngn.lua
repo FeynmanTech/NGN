@@ -64,135 +64,74 @@ function ngn.args(argStr, lvars)
 end
 
 ngn.vars = {}
-ngn.rules = {}
-ngn.exec = {}
-
-ngn.rules["var"] = "STR ;$  #;STR*;=  #;ETC*;SEM#;"
-ngn.exec["var"] = function(lvars, var, etc)
-    ngn.vars[var] = ngn.eval(etc, lvars)
-end
----[[
-ngn.rules["$"] = "$  #;STR*;= v#;ETC*;SEM ;"
-ngn.exec["$"] = function(lvars, var, etc)
-    ngn.vars[var] = ngn.eval(etc, lvars)
-end
---]]
-
-ngn.rules["pvar"] = "STR ;$  #;STR*;SEM ;"
-ngn.exec["pvar"] = function(lvars, var)
-    print(type(ngn.vars[var]) .. ": " .. tostring(ngn.vars[var]))
-end
-
-ngn.rules["plvar"] = "STR ;$  #;STR*;SEM ;"
-ngn.exec["plvar"] = function(lvars, var)
-    print(type(lvars[var]) .. ": " .. tostring(lvars[var]))
-end
-
-ngn.rules["for"] = "STR ;(  #;$  #;STR*;=  #;ETC*;,  #;ETC*;){{#;ETC*;}}}#;"
-ngn.exec["for"] = function(lvars, var, start, stop, code)
-    --print("for")
-    code = trim(code):sub(2,-1)
-    for n = ngn.eval(start, lvars), ngn.eval(stop, lvars) do
-        lvars[var] = n
-        ngn.lex(code, lvars, true)
-    end
-end
-
-ngn.rules["print"] = "STR ;(  #;ETC*;)))#;"
-ngn.exec["print"] = function(lvars, args)
-    local a = ngn.args(args, lvars)
-    for i, v in ipairs(a) do
-        print(ngn.eval(v, lvars))
-    end
-end
 
 ngn.level = 0
 ngn.openers = [[{([<]] .. '"' .. "'"
 ngn.closers = [[})]>]] .. '"' .. "'"
 ngn.container = 0
 
-ngn.token_keys = {
-["STR"] = function(c, n) return c:find("%a") end,
-["ETC"] = function(c, n) 
-    if not n then 
-        return true 
-    else 
-        if ngn.level <= 1 then
-            if ngn.token_keys[n:sub(1,-2)] then
-                return not(ngn.token_keys[n:sub(1,3)](c))
-            elseif not(n:sub(1,-2):find(esc(c))) then
-                if ngn.openers:find(esc(c)) then
-                    ngn.level = ngn.level + 1
-                    ngn.container = ngn.openers:find(esc(c))
-                end
-                return true
-            else
-                return false
-            end
-        else
-            if (ngn.closers:find(esc(c)) or -1) == ngn.container then
-                ngn.level = ngn.level - 1
-                --print(ngn.container, c)
-                ngn.container = 0
-            end
-            return true
-        end
-    end
-end,
-["SEM"] = function(c, n) return c == ";" end,
+ngn.tokens = {
+{"if", "<if>"},
+{"for%s-(%b())%s-(%b{});", "<for:%1,%2>"},
+{"for", "<for>"},
+{"%$(%w+)%s+=%s+(.-);", "<assignment:%1,%2>"},
+{"%$(%w+)%s-%+=%s-(.-);", "<add:%1,%2>"},
+{"%$(%w+)%s-%-=%s-(.-);", "<subtract:%1,%2>"},
+{"%$(%w+)%s-%*=%s-(.-);", "<multiply:%1,%2>"},
+{"%$(%w+)%s-/=%s-(.-);", "<divide:%1,%2>"},
+{"%$(%w+)%s-%+%+%s-;", "<increment:%1>"},
+{"%$(%w+)%s-%-%-%s-;", "<decrement:%1>"},
+{"%$(%w+)", "<var:%1>"},
+{"%(", "("},
+{"%)", ")"},
+{"{", "{"},
+{"}", "}"},
+{"%[", "["},
+{"%]", "]"},
+{'(%b"")', "<string:%1>"},
+{"==", "<equals>"},
+{"=", "="},
+{"(%w+)%s-(%b())", "<functioncall:%1,%2>"},
+{";", "<eol>"},
+{"(%S+)", "<value:%1>"}
 }
-function ngn.tokenize(rule, str, p)
-    local s = ngn.rules[rule]
-    local rt = {}
-    local ct = 1
-    local arg = {}
-    for r in s:gmatch("(....);") do
-        table.insert(rt, r)
-    end
-    local cs = ""
-    while ct < #rt and p <= #str do
-        local cc = str:sub(p,p)
-        if (ngn.token_keys[rt[ct]:sub(1,-2)] and ngn.token_keys[rt[ct]:sub(1,-2)](cc, rt[ct+1])) or (rt[ct]:sub(-1,-1) == "#" and rt[ct]:sub(1,-2):find(cc, 1, true)) then
-            --LOG = LOG .. cc .. " - " .. rt[ct] .. " - PASS" .. "\n"
-            cs = cs .. cc
-            p = p + 1
-        else
-            --LOG = LOG .. cc .. " - " .. rt[ct] .. " - FAIL" .. " - KEYRES: " .. tostring(not(not(ngn.token_keys[rt[ct]:sub(1,-2)]))) .. ", " .. tostring(ngn.token_keys[rt[ct]:sub(1,-2)] and ngn.token_keys[rt[ct]:sub(1,-2)](cc, rt[ct+1])) .. "\n"
-            if rt[ct]:sub(4,4) == "*" then table.insert(arg, cs) end
-            cs = ""
-            ct = ct + 1
+
+ngn.rules = {
+{"<assignment:(.-),(.-)>", function(lvars, var, val) 
+    ngn.vars[var] = ngn.eval(val, lvars) 
+    print('"' .. var .. ' = "' .. val .. '"')
+end}
+}
+
+function ngn.tokenize(str)
+    local t, r = "", ""
+    while #str > 0 do
+        for _, ct in ipairs(ngn.tokens) do
+            local s, e = str:find(ct[1])
+            if s == 1 then
+                t = t .. str:sub(s, e):gsub(ct[1], ct[2])
+                r = r .. ct[2]:gsub("%S?%%%d", "")
+                str = str:sub(e, -1)
+                break break
+            end
         end
+        str = str:sub(2,-1)
     end
-    --print(table.concat(arg, ", "))
-    return p, {rule, arg}
+    return t, r
 end
 
-function ngn.lex(str, lvars, run)
-    str = str:gsub("\n", " "):gsub("%[#.-#%]", "")
-    --print(str)
+function ngn.run(t, lvars)
     lvars = lvars or {}
-    local out = {}
-    local n = 1
-    local cr = ""
-    while n < #str do
-        local cs = str:sub(n,n)
-        cr = cr .. trim(cs)
-        if ngn.rules[cr] then
-            local np, ex = ngn.tokenize(cr, str, n)
-            n = np+1
-            table.insert(out, ex)
-            cr = ""
-        else
-            n = n + 1
+    while #t > 0 do
+        for _, r in ipairs(ngn.rules) do
+            local s, e = t:find(r[1])
+            if s == 1 then
+                r[2](lvars, t:match(r[1]))
+                t = t:sub(e, -1)
+                break break
+            end
         end
-    end
-    if run then ngn.run(out, lvars) end
-    return out
-end
-
-ngn.run = function(x, lvars)
-    for i, v in ipairs(x) do
-        ngn.exec[v[1]](lvars, unpack(v[2]))
+        t = t:sub(2,-1)
     end
 end
 
