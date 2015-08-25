@@ -4,7 +4,64 @@ function trim(s)
     return (tostring(s):gsub("^%s*(.-)%s*$", "%1"))
 end
 
+quotepattern = '(['..("%^$().[]*+-?"):gsub("(.)", "%%%1")..'])'
+esc = function(str)
+    return str:gsub(quotepattern, "%%%1")
+end
+
 ngn = {}
+
+function ngn.args(argStr, lvars)
+    local args = {}
+    local aPos, aCount, aCurrent, aLevel, aLChar = 1, 1, "", 0, ""
+    local aChars = {["("] = ")", ["{"] = "}", ['"'] = '"', ["'"] = "'", ["["] = "]"}
+    --local aStr = ""
+    local aIndex
+    --print(argStr)
+    while aPos <= #argStr do
+        local cc = argStr:sub(aPos, aPos)
+        --aStr = aStr .. cc .. ": level " .. aLevel .. ", end " .. aLChar .. "\n"
+        if aChars[cc] then
+            aLevel = aLevel + 1
+            aLChar = aChars[cc]
+            if cc == "[" and aLevel == 0 then
+                aIndex = argStr:match("%b[]", aPos):sub(2, -2)
+                aCurrent = aCurrent + argStr:match("%b[]", aPos):sub(2, -2):len()
+            else
+                aCurrent = aCurrent .. cc
+            end
+        elseif cc == aLChar then
+            aLevel = aLevel - 1
+            aCurrent = aCurrent .. cc
+            aLChar = ""
+        elseif (cc == "," and aLevel == 0) or aPos >= #argStr then
+            if aPos >= #argStr and cc ~= "," then
+                aCurrent = aCurrent .. cc
+            end
+            if aIndex then
+                args[ngn.eval(aIndex, lvars)] = ngn.eval(aCurrent, lvars)
+            else
+                table.insert(args, ngn.eval(aCurrent, lvars))
+            end
+            aIndex = nil
+            --print("Arg: ", aCurrent)
+            aCurrent = ""
+            --[[
+            while aPos <= #argStr and argStr:sub(aPos, aPos):match("%s") do
+                aPos = aPos + 1
+            end
+            --[=[
+            --]]
+            aPos = aPos + 0
+            --]=]
+        else
+            aCurrent = aCurrent .. cc
+        end
+        --print(cc)
+        aPos = aPos + 1     
+    end
+    return args
+end
 
 ngn.vars = {}
 ngn.rules = {}
@@ -15,7 +72,7 @@ ngn.exec["var"] = function(lvars, var, etc)
     ngn.vars[var] = ngn.eval(etc, lvars)
 end
 ---[[
-ngn.rules["$"] = "$  #;STR*;= v#;ETC*;SEM#;"
+ngn.rules["$"] = "$  #;STR*;= v#;ETC*;SEM ;"
 ngn.exec["$"] = function(lvars, var, etc)
     ngn.vars[var] = ngn.eval(etc, lvars)
 end
@@ -31,13 +88,21 @@ ngn.exec["plvar"] = function(lvars, var)
     print(type(lvars[var]) .. ": " .. tostring(lvars[var]))
 end
 
-ngn.rules["for"] = "STR ;(  #;$  #;STR*;=  #;ETC*;,  #;ETC*;){{#;ETC*;}}} ;"
+ngn.rules["for"] = "STR ;(  #;$  #;STR*;=  #;ETC*;,  #;ETC*;){{#;ETC*;}}}#;"
 ngn.exec["for"] = function(lvars, var, start, stop, code)
     --print("for")
     code = trim(code):sub(2,-1)
     for n = ngn.eval(start, lvars), ngn.eval(stop, lvars) do
         lvars[var] = n
-        ngn.lex(code, lvars)
+        ngn.lex(code, lvars, true)
+    end
+end
+
+ngn.rules["print"] = "STR ;(  #;ETC*;)))#;"
+ngn.exec["print"] = function(lvars, args)
+    local a = ngn.args(args, lvars)
+    for i, v in ipairs(a) do
+        print(ngn.eval(v, lvars))
     end
 end
 
@@ -54,19 +119,20 @@ ngn.token_keys = {
     else 
         if ngn.level <= 1 then
             if ngn.token_keys[n:sub(1,-2)] then
-                return not(ngn.token_keys[n:sub(1,-2)](c))
-            elseif not(n:sub(1,3):find(c, 1, true)) then
-                if ngn.openers:find(c) then
+                return not(ngn.token_keys[n:sub(1,3)](c))
+            elseif not(n:sub(1,-2):find(esc(c))) then
+                if ngn.openers:find(esc(c)) then
                     ngn.level = ngn.level + 1
-                    ngn.container = ngn.openers:find(c)
+                    ngn.container = ngn.openers:find(esc(c))
                 end
                 return true
             else
                 return false
             end
         else
-            if (ngn.closers:find(c) or -1) == ngn.container then
+            if (ngn.closers:find(esc(c)) or -1) == ngn.container then
                 ngn.level = ngn.level - 1
+                --print(ngn.container, c)
                 ngn.container = 0
             end
             return true
@@ -101,10 +167,10 @@ function ngn.tokenize(rule, str, p)
     return p, {rule, arg}
 end
 
-function ngn.lex(str, lvars)
-    str = str:gsub("\n", " ")
+function ngn.lex(str, lvars, run)
+    str = str:gsub("\n", " "):gsub("%[#.-#%]", "")
     --print(str)
-    local lvars = lvars or {}
+    lvars = lvars or {}
     local out = {}
     local n = 1
     local cr = ""
@@ -120,7 +186,7 @@ function ngn.lex(str, lvars)
             n = n + 1
         end
     end
-    ngn.run(out, lvars)
+    if run then ngn.run(out, lvars) end
     return out
 end
 
