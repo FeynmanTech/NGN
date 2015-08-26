@@ -1,5 +1,3 @@
-LOG = ""
-
 function trim(s)
     return (tostring(s):gsub("^%s*(.-)%s*$", "%1"))
 end
@@ -64,6 +62,13 @@ function ngn.args(argStr, lvars)
 end
 
 ngn.vars = {}
+ngn.func = {
+["print-verbose"] = function(lvars, ...)
+    for i, v in ipairs{...} do
+        print(type(ngn.eval(v, lvars)) .. ": " .. tostring(ngn.eval(v, lvars)))
+    end
+end,
+}
 
 ngn.level = 0
 ngn.openers = [[{([<]] .. '"' .. "'"
@@ -71,17 +76,20 @@ ngn.closers = [[})]>]] .. '"' .. "'"
 ngn.container = 0
 
 ngn.tokens = {
+{"if%s-(%b())", "<if:%1>"},
+{"elseif%s-(%b())", "<elseif:%1>"},
+{"else", "<else>"},
 {"if", "<if>"},
-{"for%s-(%b())%s-(%b{});", "<for:%1,%2>"},
+{"for%s-(%b())", "<for:%1>"},
 {"for", "<for>"},
-{"%$(%w+)%s+=%s+(.-);", "<assignment:%1,%2>"},
-{"%$(%w+)%s-%+=%s-(.-);", "<add:%1,%2>"},
-{"%$(%w+)%s-%-=%s-(.-);", "<subtract:%1,%2>"},
-{"%$(%w+)%s-%*=%s-(.-);", "<multiply:%1,%2>"},
-{"%$(%w+)%s-/=%s-(.-);", "<divide:%1,%2>"},
-{"%$(%w+)%s-%+%+%s-;", "<increment:%1>"},
-{"%$(%w+)%s-%-%-%s-;", "<decrement:%1>"},
-{"%$(%w+)", "<var:%1>"},
+{"%$([%w_%-]+)%s+=%s+(.-);", "<assignment:%1,%2>"},
+{"%$([%w_%-]+)%s-%+=%s-(.-);", "<add:%1,%2>"},
+{"%$([%w_%-]+)%s-%-=%s-(.-);", "<subtract:%1,%2>"},
+{"%$([%w_%-]+)%s-%*=%s-(.-);", "<multiply:%1,%2>"},
+{"%$([%w_%-]+)%s-/=%s-(.-);", "<divide:%1,%2>"},
+{"%$([%w_%-]+)%s-%+%+%s-;", "<increment:%1>"},
+{"%$([%w_%-]+)%s-%-%-%s-;", "<decrement:%1>"},
+{"%$([%w_%-]+)", "<var:%1>"},
 {"%(", "("},
 {"%)", ")"},
 {"{", "{"},
@@ -91,7 +99,7 @@ ngn.tokens = {
 {'(%b"")', "<string:%1>"},
 {"==", "<equals>"},
 {"=", "="},
-{"(%w+)%s-(%b())", "<functioncall:%1,%2>"},
+{"([%w_%-]+)%s-(%b())", "<functioncall:%1,%2>"},
 {";", "<eol>"},
 {"(%S+)", "<value:%1>"}
 }
@@ -101,7 +109,7 @@ ngn.rules = {
     ngn.vars[var] = ngn.eval(val, lvars) 
 end},
 {"<add:(.-),(.-)>", function(lvars, var, val) 
-    ngn.vars[var] = ngn.vars[var] + ngn.eval(val, lvars) 
+    ngn.vars[var] = ngn.vars[var] + ngn.eval(val, lvars)
 end},
 {"<subtract:(.-),(.-)>", function(lvars, var, val) 
     ngn.vars[var] = ngn.vars[var] - ngn.eval(val, lvars) 
@@ -123,16 +131,22 @@ end},
     for i, v in ipairs(ngn.args(args, lvars)) do table.insert(o, ngn.eval(v, lvars)) end
     print(table.concat(o, "\t"))
 end},
-{"<for:%(%s-%$(%w+)%s*=%s*(.-),%s*(.-)%s*%),(%b{})>", function(lvars, var, start, stop, code) 
+{"<for:%(%s-%$([%w_%-]+)%s*=%s*(.-),%s*(.-)%s*%)>(%b{})", function(lvars, var, start, stop, code) 
     start, stop = ngn.eval(start, lvars), ngn.eval(stop, lvars)
     for n = start, stop do
         lvars[var] = n
-        ngn.run(ngn.tokenize(code:sub(2,-2)), lvars)
+        ngn.run(code:sub(2,-2), lvars)
     end
-end}
+end},
+{"<functioncall:(.-),%((.-)%)>", function(lvars, func, args) 
+    local o = {}
+    for i, v in ipairs(ngn.args(args, lvars)) do table.insert(o, ngn.eval(v, lvars)) end
+    ngn.func[func](lvars, unpack(o))
+end},
 }
 
 function ngn.tokenize(str)
+    str = str:gsub("%[#.-#%]", ""):gsub("##.-\n", "")
     local t, r = "", ""
     while #str > 0 do
         for _, ct in ipairs(ngn.tokens) do
@@ -172,11 +186,14 @@ function ngn.eval(statement, lvars)
     for i, v in pairs(lvars) do
         --print(i, v)
         --statement = statement:gsub("%$" .. tostring(i) .. "%s-(%b[])", "ngn.lvars[ [[" .. i .. "]] ]%1")
-        statement = statement:gsub("%$" .. tostring(i) .. "(%W)", "ngn.lvars['" .. i .. "']%1")
+        statement = statement:gsub("%$" .. tostring(i) .. "([^%w_%-])", "ngn.lvars['" .. i .. "']%1")
     end
     for i, v in pairs(ngn.vars) do
         statement = statement:gsub("%$" .. tostring(i) .. "%s-(%b[])", "ngn.vars[ [[" .. tostring(i) .. "]] ]%1")
-        statement = statement:gsub("%$" .. tostring(i) .. "(%W)", "ngn.vars[ [[" .. i .. "]] ]%1")
+        statement = statement:gsub("%$" .. tostring(i) .. "([^%w_%-])", "ngn.vars[ [[" .. i .. "]] ]%1")
+    end
+    for i, v in pairs(ngn.func) do
+        statement = string.gsub(statement, i.."%s-(%b())", "(ngn.func['"..i.."'])(ngn.lvars, unpack(ngn.getArgsFromString('%1', ngn.lvars)))")
     end
     local f, err = loadstring("return " .. statement)
     local s, val = pcall(f)
