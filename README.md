@@ -23,33 +23,7 @@ All variables are stored with global visibility except function and type argumen
 
 All boolean operators are the same as those in Lua.
 ### If/Select Statements ###
-If statements in NGN are similar to those in other languages:
-
-    if [condition] {
-        ## code
-    };
-Conditions are parsed in Lua.
-
-Although NGN has if/else and if/elseif statements, they are extremely unreliable - instead, use select or selectall. Although select statements are structured differently than if/elseif statements, they function exactly the same. A basic select statement looks like this:
-
-    select {
-        [condition 1] {
-            ## code
-        };
-        [condition 2] {
-            ## code
-        };
-        ## etc
-    };
-The first case to evaluate as non-false will be executed, and the program will exit the statement and continue executing. A selectall statement is identical to a select, but will execute EVERY case that is non-false:
-
-    selectall {
-        [condition 1] {
-            ## code
-        };
-        ## etc
-    };
-In NGN, all values besides false and nil are considered non-false, including empty strings and 0.
+`NOT IMPLEMENTED YET`
 ### Loops ###
 For loops:
 
