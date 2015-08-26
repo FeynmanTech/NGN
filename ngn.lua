@@ -90,7 +90,7 @@ ngn.tokens = {
 {"%.%.", "<concat>"},
 {"([%d%.]+)", "<number:%1>"},
 {"([%w_]+)", "<name:%1>"},
-{"[%+%-%*/]", "%1"},
+{"[%+%-%*/%%]", "%1"},
 {"(%S+)", "<value:%1>"}
 }
 
@@ -118,6 +118,12 @@ end},
     local code = code:gsub("@OBR;", "["):gsub("@CBR;", "]"):gsub("@OCB;", "{"):gsub("@CCB;", "}")
     for n = start, stop do
         lvars[var] = n
+        if lvars.INTERP then ngn.interpret(code, lvars) else ngn.run(code, lvars) end
+    end
+end},
+{"<if>(%b())(%b{})<eol>", function(lvars, condition, code)
+    local code = code:gsub("@OBR;", "["):gsub("@CBR;", "]"):gsub("@OCB;", "{"):gsub("@CCB;", "}")
+    if ngn.evalToken(condition:sub(2,-2), lvars) then
         if lvars.INTERP then ngn.interpret(code, lvars) else ngn.run(code, lvars) end
     end
 end},
@@ -159,21 +165,7 @@ function ngn.tokenize(str)
     end
     return t, r
 end
-
-function ngn.testValidity(t, lvars)
-    lvars = lvars or {}
-    local foundMatch = false
-    for r, a in t:gmatch("{(%b<>):(.-)};") do
-        local arg = {}
-        for ca in a:gmatch("%b[]") do
-            table.insert(arg, ca:sub(2,-2))
-        end
-        if not ngn.rules[tonumber(r:sub(2,-2))] then return false end
-        foundMatch = true
-    end
-    return foundMatch
-end
-
+    
 function ngn.compile(t, lvars)
     local cs = ""
     lvars = lvars or {}
@@ -206,7 +198,7 @@ function ngn.compile(t, lvars)
     end
     return cs
 end
-
+    
 function ngn.interpret(t, lvars)
     lvars = lvars or {}
     lvars.INTERP = true
@@ -222,7 +214,7 @@ function ngn.interpret(t, lvars)
         t = t:sub(2,-1)
     end
 end
-
+    
 function ngn.run(t, lvars)
     lvars = lvars or {}
     for b in t:gmatch("%b{};") do
