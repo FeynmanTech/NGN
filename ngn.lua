@@ -13,12 +13,9 @@ function ngn.args(argStr, lvars)
     local args = {}
     local aPos, aCount, aCurrent, aLevel, aLChar = 1, 1, "", 0, ""
     local aChars = {["("] = ")", ["{"] = "}", ['"'] = '"', ["'"] = "'", ["["] = "]"}
-    --local aStr = ""
     local aIndex
-    --print(argStr)
     while aPos <= #argStr do
         local cc = argStr:sub(aPos, aPos)
-        --aStr = aStr .. cc .. ": level " .. aLevel .. ", end " .. aLChar .. "\n"
         if aChars[cc] then
             aLevel = aLevel + 1
             aLChar = aChars[cc]
@@ -42,20 +39,10 @@ function ngn.args(argStr, lvars)
                 table.insert(args, ngn.eval(aCurrent, lvars))
             end
             aIndex = nil
-            --print("Arg: ", aCurrent)
             aCurrent = ""
-            --[[
-            while aPos <= #argStr and argStr:sub(aPos, aPos):match("%s") do
-                aPos = aPos + 1
-            end
-            --[=[
-            --]]
-            aPos = aPos + 0
-            --]=]
         else
             aCurrent = aCurrent .. cc
         end
-        --print(cc)
         aPos = aPos + 1     
     end
     return args
@@ -99,7 +86,6 @@ ngn.tokens = {
 {'(%b"")', "<string:%1>"},
 {"==", "=="},
 {"=", "="},
---{"([%w_%-]+)%s-(%b())", "<functioncall:%1,%2>"},
 {";", "<eol>"},
 {"%.%.", "<concat>"},
 {"([%d%.]+)", "<number:%1>"},
@@ -109,37 +95,30 @@ ngn.tokens = {
 }
 
 ngn.rules = {
+{"<var:([^>]+)>%+=(.-)<eol>", function(lvars, var, val) 
+    ngn.vars[var] = ngn.vars[var] + ngn.evalToken(val, lvars) 
+end},
+{"<var:([^>]+)>%-=(.-)<eol>", function(lvars, var, val) 
+    ngn.vars[var] = ngn.vars[var] - ngn.evalToken(val, lvars) 
+end},
+{"<var:([^>]+)>%*=(.-)<eol>", function(lvars, var, val) 
+    ngn.vars[var] = ngn.vars[var] * ngn.evalToken(val, lvars) 
+end},
+{"<var:([^>]+)>/=(.-)<eol>", function(lvars, var, val) 
+    ngn.vars[var] = ngn.vars[var] * ngn.evalToken(val, lvars) 
+end},
 {"<var:([^>]+)>=(.-)<eol>", function(lvars, var, val) 
     ngn.vars[var] = ngn.evalToken(val, lvars) 
-end},
-{"<add:(.-),(.-)>", function(lvars, var, val) 
-    ngn.vars[var] = ngn.vars[var] + ngn.eval(val, lvars)
-end},
-{"<subtract:(.-),(.-)>", function(lvars, var, val) 
-    ngn.vars[var] = ngn.vars[var] - ngn.eval(val, lvars) 
-end},
-{"<multiply:(.-),(.-)>", function(lvars, var, val) 
-    ngn.vars[var] = ngn.vars[var] * ngn.eval(val, lvars) 
-end},
-{"<divide:(.-),(.-)>", function(lvars, var, val) 
-    ngn.vars[var] = ngn.vars[var] / ngn.eval(val, lvars) 
-end},
-{"<increment:(.-)>", function(lvars, var) 
-    ngn.vars[var] = ngn.vars[var] + 1
-end},
-{"<decrement:(.-)>", function(lvars, var) 
-    ngn.vars[var] = ngn.vars[var] - 1
 end},
 {"<for>(%b())(%b{})<eol>", function(lvars, step, code)
     local var, bounds
     for v, b in step:gmatch("<var:([%w_]+)>=(.+)%)") do var, bounds = v, b end
-    --print(bounds)
     bounds = ngn.args(bounds)
     start, stop = ngn.evalToken(bounds[1], lvars), ngn.evalToken(bounds[2], lvars)
-    --print(start, stop)
+    local code = code:gsub("@OBR;", "["):gsub("@CBR;", "]"):gsub("@OCB;", "{"):gsub("@CCB;", "}")
     for n = start, stop do
         lvars[var] = n
-        ngn.run(code:sub(2,-2), lvars)
+        if lvars.INTERP then ngn.interpret(code, lvars) else ngn.run(code, lvars) end
     end
 end},
 {"<name:([%w_]+)>(%b())", function(lvars, func, args) 
@@ -159,7 +138,6 @@ end},
                 lvars[args[i]] = ngn.evalToken(v, lvars)
             end
         end
-        ngn.run(c:sub(2,-2), lvars)
     end
 end},
 }
@@ -182,8 +160,56 @@ function ngn.tokenize(str)
     return t, r
 end
 
-function ngn.run(t, lvars)
+function ngn.testValidity(t, lvars)
     lvars = lvars or {}
+    local foundMatch = false
+    for r, a in t:gmatch("{(%b<>):(.-)};") do
+        local arg = {}
+        for ca in a:gmatch("%b[]") do
+            table.insert(arg, ca:sub(2,-2))
+        end
+        if not ngn.rules[tonumber(r:sub(2,-2))] then return false end
+        foundMatch = true
+    end
+    return foundMatch
+end
+
+function ngn.compile(t, lvars)
+    local cs = ""
+    lvars = lvars or {}
+    while #t > 0 do
+        for _, r in ipairs(ngn.rules) do
+            local s, e = t:find(r[1])
+            if s == 1 then
+                local d = {t:match(r[1])}
+                cs = cs .. "{<" .. _ .. ">:"
+                for i, v in ipairs(d) do 
+                    cs = cs .. "["
+                    if v:match("%b{}") == v then
+                        local comp = ngn.compile(v:sub(2,-2), lvars)
+                        comp = comp
+                            :gsub("%b[]",function(r)return "@OBR;"..r:sub(2,-2).."@CBR;" end)
+                            :gsub("%b{}",function(r)return "@OCB;"..r:sub(2,-2).."@CCB;" end)
+                        or comp
+                        cs = cs .. comp
+                    else
+                        cs = cs .. v
+                    end
+                    cs = cs .. "];"
+                end
+                cs = cs .. "};"
+                t = t:sub(e, -1)
+                break break
+            end
+        end
+        t = t:sub(2,-1)
+    end
+    return cs
+end
+
+function ngn.interpret(t, lvars)
+    lvars = lvars or {}
+    lvars.INTERP = true
     while #t > 0 do
         for _, r in ipairs(ngn.rules) do
             local s, e = t:find(r[1])
@@ -197,14 +223,25 @@ function ngn.run(t, lvars)
     end
 end
 
+function ngn.run(t, lvars)
+    lvars = lvars or {}
+    for b in t:gmatch("%b{};") do
+        for r, a in b:gmatch("{(%b<>):(.-)};") do
+            local arg = {}
+            for ca in a:gmatch("(%b[]);") do
+                table.insert(arg, ca:sub(2,-2))
+            end
+            ngn.rules[tonumber(r:sub(2,-2))][2](lvars, table.unpack(arg))
+        end
+    end
+end
+
 function ngn.eval(statement, lvars)
     ngn.lvars = lvars
     statement = tostring(statement) .. " " -- easy bugfix
     lvars = lvars or {}
     local value
     for i, v in pairs(lvars) do
-        --print(i, v)
-        --statement = statement:gsub("%$" .. tostring(i) .. "%s-(%b[])", "ngn.lvars[ [[" .. i .. "]] ]%1")
         statement = statement:gsub("%$" .. tostring(i) .. "([^%w_%-])", "ngn.lvars['" .. i .. "']%1")
     end
     for i, v in pairs(ngn.vars) do
@@ -226,12 +263,9 @@ function ngn.evalToken(statement, lvars)
     lvars = lvars or {}
     local value
     for i, v in pairs(lvars) do
-        --print(i, v)
-        --statement = statement:gsub("%$" .. tostring(i) .. "%s-(%b[])", "ngn.lvars[ [[" .. i .. "]] ]%1")
         statement = statement:gsub("<var:" .. tostring(i) .. ">", "ngn.lvars['" .. i .. "']")
     end
     for i, v in pairs(ngn.vars) do
-        --statement = statement:gsub("%$" .. tostring(i) .. "%s-(%b[])", "ngn.vars[ [[" .. tostring(i) .. "]] ]%1")
         statement = statement:gsub("<var:" .. tostring(i) .. ">", "ngn.vars[ [[" .. i .. "]] ]")
     end
     for i, v in pairs(ngn.func) do
