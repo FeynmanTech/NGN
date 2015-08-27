@@ -271,3 +271,17 @@ function ngn.evalToken(statement, lvars)
     if not(err) then value = val else value = statement end
     return value
 end
+
+if arg then
+    if arg[1] then
+        local t
+        local f = io.open(arg[1], "r")
+        if f then t = f:read("*all") else return false end
+        print("Tokenizing")
+        local tk = ngn.tokenize(t)
+        print("Compiling")
+        local c = ngn.compile(tk)
+        print("Running")
+        ngn.run(c)
+    end
+end

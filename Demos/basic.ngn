@@ -1,0 +1,19 @@
+## Basic var ops
+$a = 1;
+$b = 2;
+$str = "nums: ";
+for ($n = 1, 10) {
+	$str = $str .. $n .. " ";
+	$a += $n;
+	$b += $a;
+};
+
+## Extended
+print($str);
+print_verbose($a, $b);
+    
+function multiply($var1, $var2)
+{
+	print($var1 * $var2);
+};
+multiply(2, 3);
