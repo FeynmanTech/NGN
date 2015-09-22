@@ -9,6 +9,14 @@ end
 
 ngn = {}
 
+ngn.logs = {}
+
+function ngn.log(...)
+    for i, v in ipairs{...} do
+        table.insert(ngn.log, v)
+    end
+end
+
 function ngn.args(argStr, lvars)
     local args = {}
     local aPos, aCount, aCurrent, aLevel, aLChar = 1, 1, "", 0, ""
@@ -120,7 +128,8 @@ end},
     --local step = step:gsub("@OBR", "["):gsub("@CBR", "]"):gsub("@OCB", "{"):gsub("@CCB", "}")
     local var, bounds
     for v, b in step:gmatch("<var:([%w_]+)>=(.+)%)") do var, bounds = v, b end
-    bounds = ngn.args(bounds)
+    --print(var)
+    bounds = ngn.args(bounds, lvars)
     start, stop = ngn.evalToken(bounds[1], lvars), ngn.evalToken(bounds[2], lvars)
     local code = code:gsub("@OBR", "["):gsub("@CBR", "]"):gsub("@OCB", "{"):gsub("@CCB", "}")
     --print(code)
@@ -275,9 +284,9 @@ function ngn.eval(statement, lvars)
 end
 
 function ngn.evalToken(statement, lvars)
-    ngn.lvars = lvars
     statement = tostring(statement) .. " " -- easy bugfix
     lvars = lvars or {}
+    ngn.lvars = lvars
     local value
     for i, v in pairs(lvars) do
         statement = statement:gsub("<var:" .. i .. ">", "ngn.lvars['" .. i .. "']")
@@ -294,7 +303,7 @@ function ngn.evalToken(statement, lvars)
     local f, err = loadstring("return " .. statement)
     local s, val = pcall(f)
     if not(err) then value = val else value = statement end
-    return statement--value
+    return value
 end
 
 if arg then
